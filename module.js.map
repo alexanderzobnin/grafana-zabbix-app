@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/module.js"],"names":[],"mappings":";;;;;;AAAQ;;;4BAGN","file":"module.js","sourcesContent":["import {ZabbixAppConfigCtrl} from './components/config';\n\nexport {\n  ZabbixAppConfigCtrl as ConfigCtrl\n};\n"]}

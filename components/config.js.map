@@ -1,0 +1,1 @@
+{"version":3,"sources":["../../src/components/config.js"],"names":[],"mappings":";;;;;;;;;;;;;;qCAAa,sBACX,SADW,mBACX,GAAc;8BADH,qBACG;OAAd;;;;AAEF,0BAAoB,WAApB,GAAkC,wBAAlC","file":"config.js","sourcesContent":["export class ZabbixAppConfigCtrl {\n  constructor() { }\n}\nZabbixAppConfigCtrl.templateUrl = 'components/config.html';\n"]}
