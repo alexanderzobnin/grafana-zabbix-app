@@ -134,7 +134,8 @@ System.register(['angular', 'lodash', './utils', './zabbixAPICore.service'], fun
         value: function getItems(hostids, appids) {
           var params = {
             output: ['name', 'key_', 'value_type', 'hostid', 'status', 'state'],
-            sortfield: 'name'
+            sortfield: 'name',
+            webitems: true
           };
           if (hostids) {
             params.hostids = hostids;
