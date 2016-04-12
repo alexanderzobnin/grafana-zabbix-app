@@ -31,6 +31,40 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
       expandable: false
     };
   }
+
+  /**
+   * Custom formatter for template variables.
+   * Default Grafana "regex" formatter returns
+   * value1|value2
+   * This formatter returns
+   * (value1|value2)
+   * This format needed for using in complex regex with
+   * template variables, for example
+   * /CPU $cpu_item.*time/ where $cpu_item is system,user,iowait
+   */
+  function zabbixTemplateFormat(value, variable) {
+    if (typeof value === 'string') {
+      return utils.escapeRegex(value);
+    }
+
+    var escapedValues = _.map(value, utils.escapeRegex);
+    return '(' + escapedValues.join('|') + ')';
+  }
+
+  /** If template variables are used in request, replace it using regex format
+   * and wrap with '/' for proper multi-value work. Example:
+   * $variable selected as a, b, c
+   * We use filter $variable
+   * $variable    -> a|b|c    -> /a|b|c/
+   * /$variable/  -> /a|b|c/  -> /a|b|c/
+   */
+  function replaceTemplateVars(templateSrv, target, scopedVars) {
+    var replacedTarget = templateSrv.replace(target, scopedVars, zabbixTemplateFormat);
+    if (target !== replacedTarget && !utils.regexPattern.test(replacedTarget)) {
+      replacedTarget = '/' + replacedTarget + '/';
+    }
+    return replacedTarget;
+  }
   return {
     setters: [function (_lodash) {
       _ = _lodash.default;
@@ -104,21 +138,8 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
           this.templateSrv = templateSrv;
           this.alertSrv = alertSrv;
 
-          // If template variables are used in request, replace it using regex format
-          // and wrap with '/' for proper multi-value work. Example:
-          // $variable selected as a, b, c
-          // We use filter $variable
-          // $variable    -> a|b|c    -> /a|b|c/
-          // /$variable/  -> /a|b|c/  -> /a|b|c/
-          this.multiValueFormat = "regex";
-          this.replaceTemplateVars = function (target, scopedVars) {
-            var regexPattern = /^\/.*\/$/;
-            var replacedTarget = this.templateSrv.replace(target, scopedVars, this.multiValueFormat);
-            if (target !== replacedTarget && !regexPattern.test(replacedTarget)) {
-              replacedTarget = '/' + replacedTarget + '/';
-            }
-            return replacedTarget;
-          };
+          // Use custom format for template variables
+          this.replaceTemplateVars = _.partial(replaceTemplateVars, this.templateSrv);
 
           console.log(this.zabbixCache);
         }
@@ -193,16 +214,16 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
                 }
 
                 // Replace templated variables
-                var groupFilter = this.replaceTemplateVars(target.group.filter, options.scopedVars, self.multiValueFormat);
-                var hostFilter = this.replaceTemplateVars(target.host.filter, options.scopedVars, self.multiValueFormat);
-                var appFilter = this.replaceTemplateVars(target.application.filter, options.scopedVars, self.multiValueFormat);
-                var itemFilter = this.replaceTemplateVars(target.item.filter, options.scopedVars, self.multiValueFormat);
+                var groupFilter = this.replaceTemplateVars(target.group.filter, options.scopedVars);
+                var hostFilter = this.replaceTemplateVars(target.host.filter, options.scopedVars);
+                var appFilter = this.replaceTemplateVars(target.application.filter, options.scopedVars);
+                var itemFilter = this.replaceTemplateVars(target.item.filter, options.scopedVars);
 
                 // Query numeric data
                 if (!target.mode || target.mode === 0) {
 
                   // Build query in asynchronous manner
-                  return self.queryProcessor.build(groupFilter, hostFilter, appFilter, itemFilter).then(function (items) {
+                  return self.queryProcessor.build(groupFilter, hostFilter, appFilter, itemFilter, 'num').then(function (items) {
                     // Add hostname for items from multiple hosts
                     var addHostName = utils.isRegex(target.host.filter);
                     var getHistory;
@@ -218,13 +239,13 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
                       var valueType = trendValueFunc ? trendValueFunc.params[0] : "avg";
 
                       getHistory = self.zabbixAPI.getTrend(items, from, to).then(function (history) {
-                        return self.queryProcessor.handleTrends(history, addHostName, valueType);
+                        return self.queryProcessor.handleTrends(history, items, addHostName, valueType);
                       });
                     } else {
 
                       // Use history
                       getHistory = self.zabbixCache.getHistory(items, from, to).then(function (history) {
-                        return self.queryProcessor.handleHistory(history, addHostName);
+                        return self.queryProcessor.handleHistory(history, items, addHostName);
                       });
                     }
 
@@ -273,34 +294,36 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
 
                 // Query text data
                 else if (target.mode === 2) {
-                    return self.queryProcessor.build(groupFilter, hostFilter, appFilter, itemFilter).then(function (items) {
-                      var deferred = self.q.defer();
+                    return self.queryProcessor.build(groupFilter, hostFilter, appFilter, itemFilter, 'text').then(function (items) {
                       if (items.length) {
-                        self.zabbixAPI.getLastValue(items[0].itemid).then(function (lastvalue) {
-                          if (target.textFilter) {
-                            var text_extract_pattern = new RegExp(self.replaceTemplateVars(target.textFilter, options.scopedVars));
-                            var result = text_extract_pattern.exec(lastvalue);
-                            if (result) {
-                              if (target.useCaptureGroups) {
-                                result = result[1];
-                              } else {
-                                result = result[0];
+                        var textItemsPromises = _.map(items, function (item) {
+                          return self.zabbixAPI.getLastValue(item.itemid);
+                        });
+                        return self.q.all(textItemsPromises).then(function (result) {
+                          return _.map(result, function (lastvalue, index) {
+                            var extractedValue;
+                            if (target.textFilter) {
+                              var text_extract_pattern = new RegExp(self.replaceTemplateVars(target.textFilter, options.scopedVars));
+                              extractedValue = text_extract_pattern.exec(lastvalue);
+                              if (extractedValue) {
+                                if (target.useCaptureGroups) {
+                                  extractedValue = extractedValue[1];
+                                } else {
+                                  extractedValue = extractedValue[0];
+                                }
                               }
+                            } else {
+                              extractedValue = lastvalue;
                             }
-                            deferred.resolve(result);
-                          } else {
-                            deferred.resolve(lastvalue);
-                          }
+                            return {
+                              target: items[index].name,
+                              datapoints: [[extractedValue, to * 1000]]
+                            };
+                          });
                         });
                       } else {
-                        deferred.resolve(null);
+                        return self.q.when([]);
                       }
-                      return deferred.promise.then(function (text) {
-                        return {
-                          target: target.item.name,
-                          datapoints: [[text, to * 1000]]
-                        };
-                      });
                     });
                   }
               }
@@ -339,7 +362,7 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
             var self = this;
             var parts = [];
             _.each(query.split('.'), function (part) {
-              part = self.replaceTemplateVars(part, {}, self.multiValueFormat);
+              part = self.replaceTemplateVars(part, {});
 
               // Replace wildcard to regex
               if (part === '*') {
@@ -394,7 +417,7 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
             // Show all triggers
             var showTriggers = [0, 1];
 
-            var buildQuery = self.queryProcessor.buildTriggerQuery(this.replaceTemplateVars(annotation.group, {}, self.multiValueFormat), this.replaceTemplateVars(annotation.host, {}, self.multiValueFormat), this.replaceTemplateVars(annotation.application, {}, self.multiValueFormat));
+            var buildQuery = self.queryProcessor.buildTriggerQuery(this.replaceTemplateVars(annotation.group, {}), this.replaceTemplateVars(annotation.host, {}), this.replaceTemplateVars(annotation.application, {}));
             return buildQuery.then(function (query) {
               return self.zabbixAPI.getTriggers(query.groupids, query.hostids, query.applicationids, showTriggers, timeFrom, timeTo).then(function (triggers) {
 

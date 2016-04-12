@@ -144,9 +144,9 @@ System.register(['angular', 'lodash', './utils'], function (_export, _context) {
             }
           }, {
             key: 'getItems',
-            value: function getItems(hostids, appids) {
+            value: function getItems(hostids, appids, itemtype) {
               var self = this;
-              return this.getItemsOnce(hostids, appids).then(function (items) {
+              return this.getItemsOnce(hostids, appids, itemtype).then(function (items) {
                 self._items = _.union(self._items, items);
                 return items;
               });

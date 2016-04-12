@@ -137,13 +137,13 @@ System.register(['angular', 'lodash', './utils'], function (_export, _context) {
 
           _createClass(QueryProcessor, [{
             key: 'build',
-            value: function build(groupFilter, hostFilter, appFilter, itemFilter) {
+            value: function build(groupFilter, hostFilter, appFilter, itemFilter, itemtype) {
               var self = this;
               if (this.cache._initialized) {
-                return this.$q.when(self.buildFromCache(groupFilter, hostFilter, appFilter, itemFilter));
+                return this.$q.when(self.buildFromCache(groupFilter, hostFilter, appFilter, itemFilter, itemtype));
               } else {
                 return this.cache.refresh().then(function () {
-                  return self.buildFromCache(groupFilter, hostFilter, appFilter, itemFilter);
+                  return self.buildFromCache(groupFilter, hostFilter, appFilter, itemFilter, itemtype);
                 });
               }
             }
@@ -176,8 +176,8 @@ System.register(['angular', 'lodash', './utils'], function (_export, _context) {
             }
           }, {
             key: 'buildFromCache',
-            value: function buildFromCache(groupFilter, hostFilter, appFilter, itemFilter, showDisabledItems) {
-              return this.getItems(groupFilter, hostFilter, appFilter, showDisabledItems).then(function (items) {
+            value: function buildFromCache(groupFilter, hostFilter, appFilter, itemFilter, itemtype, showDisabledItems) {
+              return this.getItems(groupFilter, hostFilter, appFilter, itemtype, showDisabledItems).then(function (items) {
                 return getByFilter(items, itemFilter);
               });
             }
@@ -210,7 +210,7 @@ System.register(['angular', 'lodash', './utils'], function (_export, _context) {
             }
           }, {
             key: 'getItems',
-            value: function getItems(groupFilter, hostFilter, appFilter, showDisabledItems) {
+            value: function getItems(groupFilter, hostFilter, appFilter, itemtype, showDisabledItems) {
               var self = this;
               return this.getHosts(groupFilter).then(function (hosts) {
                 return findByFilter(hosts, hostFilter);
@@ -229,7 +229,7 @@ System.register(['angular', 'lodash', './utils'], function (_export, _context) {
                 }
               }).then(function (apps) {
                 if (apps.appFilterEmpty) {
-                  return self.cache.getItems(apps.hostids, undefined).then(function (items) {
+                  return self.cache.getItems(apps.hostids, undefined, itemtype).then(function (items) {
                     if (showDisabledItems) {
                       items = _.filter(items, { 'status': '0' });
                     }
@@ -237,7 +237,7 @@ System.register(['angular', 'lodash', './utils'], function (_export, _context) {
                   });
                 } else {
                   var appids = _.map(apps, 'applicationid');
-                  return self.cache.getItems(undefined, appids).then(function (items) {
+                  return self.cache.getItems(undefined, appids, itemtype).then(function (items) {
                     if (showDisabledItems) {
                       items = _.filter(items, { 'status': '0' });
                     }
@@ -296,7 +296,7 @@ System.register(['angular', 'lodash', './utils'], function (_export, _context) {
             }
           }, {
             key: 'convertHistory',
-            value: function convertHistory(history, addHostName, convertPointCallback) {
+            value: function convertHistory(history, items, addHostName, convertPointCallback) {
               /**
                * Response should be in the format:
                * data: [
@@ -310,12 +310,13 @@ System.register(['angular', 'lodash', './utils'], function (_export, _context) {
 
               // Group history by itemid
               var grouped_history = _.groupBy(history, 'itemid');
+              var hosts = _.indexBy(_.flatten(_.map(items, 'hosts')), 'hostid');
 
               return _.map(grouped_history, function (hist, itemid) {
                 var item = self.cache.getItem(itemid);
                 var alias = item.name;
-                if (addHostName) {
-                  var host = self.cache.getHost(item.hostid);
+                if (_.keys(hosts).length > 1 || addHostName) {
+                  var host = hosts[item.hostid];
                   alias = host.name + ": " + alias;
                 }
                 return {
@@ -326,14 +327,14 @@ System.register(['angular', 'lodash', './utils'], function (_export, _context) {
             }
           }, {
             key: 'handleHistory',
-            value: function handleHistory(history, addHostName) {
-              return this.convertHistory(history, addHostName, convertHistoryPoint);
+            value: function handleHistory(history, items, addHostName) {
+              return this.convertHistory(history, items, addHostName, convertHistoryPoint);
             }
           }, {
             key: 'handleTrends',
-            value: function handleTrends(history, addHostName, valueType) {
+            value: function handleTrends(history, items, addHostName, valueType) {
               var convertPointCallback = _.partial(convertTrendPoint, valueType);
-              return this.convertHistory(history, addHostName, convertPointCallback);
+              return this.convertHistory(history, items, addHostName, convertPointCallback);
             }
           }, {
             key: 'handleSLAResponse',

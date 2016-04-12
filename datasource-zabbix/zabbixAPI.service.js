@@ -131,17 +131,27 @@ System.register(['angular', 'lodash', './utils', './zabbixAPICore.service'], fun
         }
       }, {
         key: 'getItems',
-        value: function getItems(hostids, appids) {
+        value: function getItems(hostids, appids, itemtype) {
           var params = {
             output: ['name', 'key_', 'value_type', 'hostid', 'status', 'state'],
             sortfield: 'name',
-            webitems: true
+            webitems: true,
+            filter: {},
+            selectHosts: ['hostid', 'name']
           };
           if (hostids) {
             params.hostids = hostids;
           }
           if (appids) {
             params.applicationids = appids;
+          }
+          if (itemtype === 'num') {
+            // Return only numeric metrics
+            params.filter.value_type = [0, 3];
+          }
+          if (itemtype === 'text') {
+            // Return only text metrics
+            params.filter.value_type = [1, 2, 4];
           }
 
           return this.request('item.get', params).then(function (items) {

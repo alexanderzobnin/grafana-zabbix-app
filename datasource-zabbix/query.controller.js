@@ -73,7 +73,7 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
 
         // ZabbixQueryCtrl constructor
 
-        function ZabbixQueryController($scope, $injector, $sce, $q, templateSrv) {
+        function ZabbixQueryController($scope, $injector, $rootScope, $sce, $q, templateSrv) {
           _classCallCheck(this, ZabbixQueryController);
 
           var _this = _possibleConstructorReturn(this, Object.getPrototypeOf(ZabbixQueryController).call(this, $scope, $injector));
@@ -81,6 +81,10 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
           _this.zabbix = _this.datasource.zabbixAPI;
           _this.cache = _this.datasource.zabbixCache;
           _this.$q = $q;
+
+          // Use custom format for template variables
+          _this.replaceTemplateVars = _this.datasource.replaceTemplateVars;
+          _this.templateSrv = templateSrv;
 
           _this.editorModes = {
             0: 'num',
@@ -94,9 +98,12 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
           _this.getApplicationNames = _.partial(getMetricNames, _this, 'appList');
           _this.getItemNames = _.partial(getMetricNames, _this, 'itemList');
 
-          _this.init = function () {
+          // Update metric suggestion when template variable was changed
+          $rootScope.$on('template-variable-value-updated', function () {
+            return _this.onVariableChange();
+          });
 
-            this.templateSrv = templateSrv;
+          _this.init = function () {
             var target = this.target;
 
             // Migrate old targets
@@ -145,12 +152,13 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
           key: 'initFilters',
           value: function initFilters() {
             var self = this;
+            var itemtype = self.editorModes[self.target.mode];
             return this.$q.when(this.suggestGroups()).then(function () {
               return self.suggestHosts();
             }).then(function () {
               return self.suggestApps();
             }).then(function () {
-              return self.suggestItems();
+              return self.suggestItems(itemtype);
             });
           }
         }, {
@@ -166,7 +174,7 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
           key: 'suggestHosts',
           value: function suggestHosts() {
             var self = this;
-            var groupFilter = this.templateSrv.replace(this.target.group.filter);
+            var groupFilter = this.replaceTemplateVars(this.target.group.filter);
             return this.datasource.queryProcessor.filterGroups(self.metric.groupList, groupFilter).then(function (groups) {
               var groupids = _.map(groups, 'groupid');
               return self.zabbix.getHosts(groupids).then(function (hosts) {
@@ -179,7 +187,7 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
           key: 'suggestApps',
           value: function suggestApps() {
             var self = this;
-            var hostFilter = this.templateSrv.replace(this.target.host.filter);
+            var hostFilter = this.replaceTemplateVars(this.target.host.filter);
             return this.datasource.queryProcessor.filterHosts(self.metric.hostList, hostFilter).then(function (hosts) {
               var hostids = _.map(hosts, 'hostid');
               return self.zabbix.getApps(hostids).then(function (apps) {
@@ -190,13 +198,15 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
         }, {
           key: 'suggestItems',
           value: function suggestItems() {
+            var itemtype = arguments.length <= 0 || arguments[0] === undefined ? 'num' : arguments[0];
+
             var self = this;
-            var appFilter = this.templateSrv.replace(this.target.application.filter);
+            var appFilter = this.replaceTemplateVars(this.target.application.filter);
             if (appFilter) {
               // Filter by applications
               return this.datasource.queryProcessor.filterApps(self.metric.appList, appFilter).then(function (apps) {
                 var appids = _.map(apps, 'applicationid');
-                return self.zabbix.getItems(undefined, appids).then(function (items) {
+                return self.zabbix.getItems(undefined, appids, itemtype).then(function (items) {
                   if (!self.target.showDisabledItems) {
                     items = _.filter(items, { 'status': '0' });
                   }
@@ -207,7 +217,7 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
             } else {
               // Return all items belonged to selected hosts
               var hostids = _.map(self.metric.hostList, 'hostid');
-              return self.zabbix.getItems(hostids).then(function (items) {
+              return self.zabbix.getItems(hostids, undefined, itemtype).then(function (items) {
                 if (!self.target.showDisabledItems) {
                   items = _.filter(items, { 'status': '0' });
                 }
@@ -247,10 +257,25 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
             var newTarget = _.cloneDeep(this.target);
             if (!_.isEqual(this.oldTarget, this.target)) {
               this.oldTarget = newTarget;
-              this.initFilters();
-              this.parseTarget();
-              this.panelCtrl.refresh();
+              this.targetChanged();
             }
+          }
+        }, {
+          key: 'onVariableChange',
+          value: function onVariableChange() {
+            if (this.isContainsVariables()) {
+              this.targetChanged();
+            }
+          }
+        }, {
+          key: 'isContainsVariables',
+          value: function isContainsVariables() {
+            var self = this;
+            return _.some(self.templateSrv.variables, function (variable) {
+              return _.some(['group', 'host', 'application', 'item'], function (field) {
+                return self.templateSrv.containsVariable(self.target[field].filter, variable.name);
+              });
+            });
           }
         }, {
           key: 'parseTarget',
@@ -268,6 +293,8 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
         }, {
           key: 'targetChanged',
           value: function targetChanged() {
+            this.initFilters();
+            this.parseTarget();
             this.panelCtrl.refresh();
           }
         }, {

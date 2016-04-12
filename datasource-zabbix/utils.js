@@ -35,7 +35,10 @@ System.register(['lodash', 'moment'], function (_export, _context) {
 
       _export('expandItemName', expandItemName);
 
-      regexPattern = /^\/(.*)\/([gmi]*)$/m;
+      _export('regexPattern', regexPattern = /^\/(.*)\/([gmi]*)$/m);
+
+      _export('regexPattern', regexPattern);
+
       function isRegex(str) {
         return regexPattern.test(str);
       }
@@ -49,7 +52,16 @@ System.register(['lodash', 'moment'], function (_export, _context) {
         return new RegExp(pattern, flags);
       }
 
+      // Need for template variables replace
+      // From Grafana's templateSrv.js
+
       _export('buildRegex', buildRegex);
+
+      function escapeRegex(value) {
+        return value.replace(/[\\^$*+?.()|[\]{}\/]/g, '\\$&');
+      }
+
+      _export('escapeRegex', escapeRegex);
 
       function parseInterval(interval) {
         var intervalPattern = /(^[\d]+)(y|M|w|d|h|m|s)/g;
