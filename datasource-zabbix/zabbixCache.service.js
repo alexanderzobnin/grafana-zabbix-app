@@ -129,9 +129,10 @@ System.register(['angular', 'lodash', './utils'], function (_export, _context) {
           }, {
             key: 'getHosts',
             value: function getHosts(groupids) {
-              var self = this;
+              //var self = this;
               return this.getHostsOnce(groupids).then(function (hosts) {
-                self._hosts = _.union(self._hosts, hosts);
+                // iss #196 - disable caching due performance issues
+                //self._hosts = _.union(self._hosts, hosts);
                 return hosts;
               });
             }
@@ -145,9 +146,10 @@ System.register(['angular', 'lodash', './utils'], function (_export, _context) {
           }, {
             key: 'getItems',
             value: function getItems(hostids, appids, itemtype) {
-              var self = this;
+              //var self = this;
               return this.getItemsOnce(hostids, appids, itemtype).then(function (items) {
-                self._items = _.union(self._items, items);
+                // iss #196 - disable caching due performance issues
+                //self._items = _.union(self._items, items);
                 return items;
               });
             }

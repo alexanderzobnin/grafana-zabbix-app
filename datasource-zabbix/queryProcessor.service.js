@@ -306,14 +306,13 @@ System.register(['angular', 'lodash', './utils'], function (_export, _context) {
                *          }, ...
                *       ]
                */
-              var self = this;
 
               // Group history by itemid
               var grouped_history = _.groupBy(history, 'itemid');
               var hosts = _.indexBy(_.flatten(_.map(items, 'hosts')), 'hostid');
 
               return _.map(grouped_history, function (hist, itemid) {
-                var item = self.cache.getItem(itemid);
+                var item = _.find(items, { 'itemid': itemid });
                 var alias = item.name;
                 if (_.keys(hosts).length > 1 || addHostName) {
                   var host = hosts[item.hostid];
