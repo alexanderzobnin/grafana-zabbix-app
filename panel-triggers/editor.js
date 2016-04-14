@@ -1,7 +1,7 @@
 'use strict';
 
-System.register(['lodash', 'jquery'], function (_export, _context) {
-  var _, $, _createClass, TriggerPanelEditorCtrl;
+System.register(['lodash', '../datasource-zabbix/utils', '../datasource-zabbix/css/query-editor.css!'], function (_export, _context) {
+  var _, utils, _createClass, TriggerPanelEditorCtrl;
 
   function _classCallCheck(instance, Constructor) {
     if (!(instance instanceof Constructor)) {
@@ -14,22 +14,12 @@ System.register(['lodash', 'jquery'], function (_export, _context) {
     return _.uniq(_.map(scope.metric[metricList], 'name'));
   }
 
-  function getTriggerIndexForElement(el) {
-    return el.parents('[data-trigger-index]').data('trigger-index');
-  }
-
-  function isRegex(str) {
-    // Pattern for testing regex
-    var regexPattern = /^\/(.*)\/([gmi]*)$/m;
-    return regexPattern.test(str);
-  }
-
   return {
     setters: [function (_lodash) {
       _ = _lodash.default;
-    }, function (_jquery) {
-      $ = _jquery.default;
-    }],
+    }, function (_datasourceZabbixUtils) {
+      utils = _datasourceZabbixUtils;
+    }, function (_datasourceZabbixCssQueryEditorCss) {}],
     execute: function () {
       _createClass = function () {
         function defineProperties(target, props) {
@@ -53,22 +43,29 @@ System.register(['lodash', 'jquery'], function (_export, _context) {
 
         /** @ngInject */
 
-        function TriggerPanelEditorCtrl($scope, $q, uiSegmentSrv, datasourceSrv, templateSrv, popoverSrv) {
+        function TriggerPanelEditorCtrl($scope, $rootScope, $q, uiSegmentSrv, datasourceSrv, templateSrv, popoverSrv) {
+          var _this = this;
+
           _classCallCheck(this, TriggerPanelEditorCtrl);
 
           $scope.editor = this;
           this.panelCtrl = $scope.ctrl;
           this.panel = this.panelCtrl.panel;
 
+          this.$q = $q;
           this.datasourceSrv = datasourceSrv;
           this.templateSrv = templateSrv;
           this.popoverSrv = popoverSrv;
 
           // Map functions for bs-typeahead
           this.getGroupNames = _.partial(getMetricNames, this, 'groupList');
-          this.getHostNames = _.partial(getMetricNames, this, 'filteredHosts');
-          this.getApplicationNames = _.partial(getMetricNames, this, 'filteredApplications');
-          this.getItemNames = _.partial(getMetricNames, this, 'filteredItems');
+          this.getHostNames = _.partial(getMetricNames, this, 'hostList');
+          this.getApplicationNames = _.partial(getMetricNames, this, 'appList');
+
+          // Update metric suggestion when template variable was changed
+          $rootScope.$on('template-variable-value-updated', function () {
+            return _this.onVariableChange();
+          });
 
           this.ackFilters = ['all triggers', 'unacknowledged', 'acknowledged'];
 
@@ -107,43 +104,69 @@ System.register(['lodash', 'jquery'], function (_export, _context) {
         _createClass(TriggerPanelEditorCtrl, [{
           key: 'initFilters',
           value: function initFilters() {
-            this.filterGroups();
-            this.filterHosts();
-            this.filterApplications();
+            var self = this;
+            return this.$q.when(this.suggestGroups()).then(function () {
+              return self.suggestHosts();
+            }).then(function () {
+              return self.suggestApps();
+            });
           }
         }, {
-          key: 'filterGroups',
-          value: function filterGroups() {
+          key: 'suggestGroups',
+          value: function suggestGroups() {
             var self = this;
-            this.datasource.queryProcessor.getGroups().then(function (groups) {
+            return this.datasource.zabbixCache.getGroups().then(function (groups) {
               self.metric.groupList = groups;
+              return groups;
             });
           }
         }, {
-          key: 'filterHosts',
-          value: function filterHosts() {
+          key: 'suggestHosts',
+          value: function suggestHosts() {
             var self = this;
-            var groupFilter = this.templateSrv.replace(this.panel.triggers.group.filter);
-            this.datasource.queryProcessor.getHosts(groupFilter).then(function (hosts) {
-              self.metric.filteredHosts = hosts;
+            var groupFilter = this.datasource.replaceTemplateVars(this.panel.triggers.group.filter);
+            return this.datasource.queryProcessor.filterGroups(self.metric.groupList, groupFilter).then(function (groups) {
+              var groupids = _.map(groups, 'groupid');
+              return self.datasource.zabbixAPI.getHosts(groupids).then(function (hosts) {
+                self.metric.hostList = hosts;
+                return hosts;
+              });
             });
           }
         }, {
-          key: 'filterApplications',
-          value: function filterApplications() {
+          key: 'suggestApps',
+          value: function suggestApps() {
             var self = this;
-            var groupFilter = this.templateSrv.replace(this.panel.triggers.group.filter);
-            var hostFilter = this.templateSrv.replace(this.panel.triggers.host.filter);
-            this.datasource.queryProcessor.getApps(groupFilter, hostFilter).then(function (apps) {
-              self.metric.filteredApplications = apps;
+            var hostFilter = this.datasource.replaceTemplateVars(this.panel.triggers.host.filter);
+            return this.datasource.queryProcessor.filterHosts(self.metric.hostList, hostFilter).then(function (hosts) {
+              var hostids = _.map(hosts, 'hostid');
+              return self.datasource.zabbixAPI.getApps(hostids).then(function (apps) {
+                return self.metric.appList = apps;
+              });
             });
           }
         }, {
-          key: 'onTargetPartChange',
-          value: function onTargetPartChange(targetPart) {
-            var regexStyle = { 'color': '#CCA300' };
-            targetPart.isRegex = isRegex(targetPart.filter);
-            targetPart.style = targetPart.isRegex ? regexStyle : {};
+          key: 'onVariableChange',
+          value: function onVariableChange() {
+            if (this.isContainsVariables()) {
+              this.targetChanged();
+            }
+          }
+        }, {
+          key: 'isContainsVariables',
+          value: function isContainsVariables() {
+            var self = this;
+            return _.some(self.templateSrv.variables, function (variable) {
+              return _.some(['group', 'host', 'application'], function (field) {
+                return self.templateSrv.containsVariable(self.panel.triggers[field].filter, variable.name);
+              });
+            });
+          }
+        }, {
+          key: 'targetChanged',
+          value: function targetChanged() {
+            this.initFilters();
+            this.panelCtrl.refresh();
           }
         }, {
           key: 'parseTarget',
@@ -176,38 +199,14 @@ System.register(['lodash', 'jquery'], function (_export, _context) {
             this.refreshTriggerSeverity();
           }
         }, {
-          key: 'openTriggerColorSelector',
-          value: function openTriggerColorSelector(event) {
-            var el = $(event.currentTarget);
-            var index = getTriggerIndexForElement(el);
-            var popoverScope = this.$new();
-            popoverScope.trigger = this.panel.triggerSeverity[index];
-            popoverScope.changeTriggerSeverityColor = this.changeTriggerSeverityColor;
-
-            this.popoverSrv.show({
-              element: el,
-              placement: 'top',
-              templateUrl: 'public/plugins/alexanderzobnin-zabbix-app/panel-triggers/trigger.colorpicker.html',
-              scope: popoverScope
-            });
+          key: 'isRegex',
+          value: function isRegex(str) {
+            return utils.isRegex(str);
           }
         }, {
-          key: 'openOkEventColorSelector',
-          value: function openOkEventColorSelector(event) {
-            var el = $(event.currentTarget);
-            var popoverScope = this.$new();
-            popoverScope.trigger = { color: this.panel.okEventColor };
-            popoverScope.changeTriggerSeverityColor = function (trigger, color) {
-              this.panel.okEventColor = color;
-              this.refreshTriggerSeverity();
-            };
-
-            this.popoverSrv.show({
-              element: el,
-              placement: 'top',
-              templateUrl: 'public/plugins/alexanderzobnin-zabbix-app/panel-triggers/trigger.colorpicker.html',
-              scope: popoverScope
-            });
+          key: 'isVariable',
+          value: function isVariable(str) {
+            return utils.isTemplateVariable(str, this.templateSrv.variables);
           }
         }]);
 

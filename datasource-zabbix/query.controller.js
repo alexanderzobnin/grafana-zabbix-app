@@ -227,13 +227,6 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
             }
           }
         }, {
-          key: 'onTargetPartChange',
-          value: function onTargetPartChange(targetPart) {
-            /*var regexStyle = {'color': '#CCA300'};
-            targetPart.isRegex = utils.isRegex(targetPart.filter);
-            targetPart.style = targetPart.isRegex ? regexStyle : {};*/
-          }
-        }, {
           key: 'isRegex',
           value: function isRegex(str) {
             return utils.isRegex(str);
@@ -241,15 +234,7 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
         }, {
           key: 'isVariable',
           value: function isVariable(str) {
-            var variablePattern = /^\$\w+/;
-            if (variablePattern.test(str)) {
-              var variables = _.map(this.templateSrv.variables, function (variable) {
-                return '$' + variable.name;
-              });
-              return _.contains(variables, str);
-            } else {
-              return false;
-            }
+            return utils.isTemplateVariable(str, this.templateSrv.variables);
           }
         }, {
           key: 'onTargetBlur',

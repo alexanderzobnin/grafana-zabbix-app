@@ -1,7 +1,7 @@
 'use strict';
 
-System.register(['lodash', 'moment', 'app/plugins/sdk', './editor', './css/panel_triggers.css!'], function (_export, _context) {
-  var _, moment, MetricsPanelCtrl, triggerPanelEditor, _createClass, defaultSeverity, panelDefaults, triggerStatusMap, defaultTimeFormat, TriggerPanelCtrl;
+System.register(['lodash', 'moment', '../datasource-zabbix/utils', 'app/plugins/sdk', './editor', './css/panel_triggers.css!'], function (_export, _context) {
+  var _, moment, utils, MetricsPanelCtrl, triggerPanelEditor, _createClass, defaultSeverity, panelDefaults, triggerStatusMap, defaultTimeFormat, TriggerPanelCtrl;
 
   function _classCallCheck(instance, Constructor) {
     if (!(instance instanceof Constructor)) {
@@ -34,9 +34,9 @@ System.register(['lodash', 'moment', 'app/plugins/sdk', './editor', './css/panel
   }
 
   function filterTriggers(triggers, triggerFilter) {
-    if (isRegex(triggerFilter)) {
+    if (utils.isRegex(triggerFilter)) {
       return _.filter(triggers, function (trigger) {
-        return buildRegex(triggerFilter).test(trigger.description);
+        return utils.buildRegex(triggerFilter).test(trigger.description);
       });
     } else {
       return _.filter(triggers, function (trigger) {
@@ -45,25 +45,13 @@ System.register(['lodash', 'moment', 'app/plugins/sdk', './editor', './css/panel
     }
   }
 
-  function isRegex(str) {
-    // Pattern for testing regex
-    var regexPattern = /^\/(.*)\/([gmi]*)$/m;
-    return regexPattern.test(str);
-  }
-
-  function buildRegex(str) {
-    var regexPattern = /^\/(.*)\/([gmi]*)$/m;
-    var matches = str.match(regexPattern);
-    var pattern = matches[1];
-    var flags = matches[2] !== "" ? matches[2] : undefined;
-    return new RegExp(pattern, flags);
-  }
-
   return {
     setters: [function (_lodash) {
       _ = _lodash.default;
     }, function (_moment) {
       moment = _moment.default;
+    }, function (_datasourceZabbixUtils) {
+      utils = _datasourceZabbixUtils;
     }, function (_appPluginsSdk) {
       MetricsPanelCtrl = _appPluginsSdk.MetricsPanelCtrl;
     }, function (_editor) {
@@ -132,7 +120,9 @@ System.register(['lodash', 'moment', 'app/plugins/sdk', './editor', './css/panel
           _this.defaultTimeFormat = defaultTimeFormat;
 
           // Load panel defaults
-          _.defaults(_this.panel, panelDefaults);
+          // _.cloneDeep() need for prevent changing shared defaultSeverity.
+          // Load object "by value" istead "by reference".
+          _.defaults(_this.panel, _.cloneDeep(panelDefaults));
 
           _this.triggerList = [];
           _this.refreshData();
@@ -163,17 +153,15 @@ System.register(['lodash', 'moment', 'app/plugins/sdk', './editor', './css/panel
               return;
             }
 
-            // clear loading/error state
-            delete this.error;
-            this.loading = true;
-            this.setTimeQueryStart();
-
             this.refreshData();
           }
         }, {
           key: 'refreshData',
           value: function refreshData() {
-            var _this2 = this;
+            // clear loading/error state
+            delete this.error;
+            this.loading = true;
+            this.setTimeQueryStart();
 
             var self = this;
 
@@ -185,9 +173,9 @@ System.register(['lodash', 'moment', 'app/plugins/sdk', './editor', './css/panel
               var triggerFilter = self.panel.triggers;
 
               // Replace template variables
-              var groupFilter = self.templateSrv.replace(triggerFilter.group.filter);
-              var hostFilter = self.templateSrv.replace(triggerFilter.host.filter);
-              var appFilter = self.templateSrv.replace(triggerFilter.application.filter);
+              var groupFilter = datasource.replaceTemplateVars(triggerFilter.group.filter);
+              var hostFilter = datasource.replaceTemplateVars(triggerFilter.host.filter);
+              var appFilter = datasource.replaceTemplateVars(triggerFilter.application.filter);
 
               var buildQuery = queryProcessor.buildTriggerQuery(groupFilter, hostFilter, appFilter);
               return buildQuery.then(function (query) {
@@ -280,8 +268,9 @@ System.register(['lodash', 'moment', 'app/plugins/sdk', './editor', './css/panel
                     // Limit triggers number
                     self.triggerList = _.first(triggerList, self.panel.limit);
 
-                    _this2.setTimeQueryEnd();
-                    _this2.loading = false;
+                    // Notify panel that request is finished
+                    self.setTimeQueryEnd();
+                    self.loading = false;
                   });
                 });
               });

@@ -45,6 +45,20 @@ System.register(['lodash', 'moment'], function (_export, _context) {
 
       _export('isRegex', isRegex);
 
+      function isTemplateVariable(str, templateVariables) {
+        var variablePattern = /^\$\w+/;
+        if (variablePattern.test(str)) {
+          var variables = _.map(templateVariables, function (variable) {
+            return '$' + variable.name;
+          });
+          return _.contains(variables, str);
+        } else {
+          return false;
+        }
+      }
+
+      _export('isTemplateVariable', isTemplateVariable);
+
       function buildRegex(str) {
         var matches = str.match(regexPattern);
         var pattern = matches[1];
