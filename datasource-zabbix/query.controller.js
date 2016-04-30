@@ -87,9 +87,9 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
           _this.templateSrv = templateSrv;
 
           _this.editorModes = {
-            0: 'num',
-            1: 'itservice',
-            2: 'text'
+            0: { value: 'num', text: 'Metrics', mode: 0 },
+            1: { value: 'itservice', text: 'IT Services', mode: 1 },
+            2: { value: 'text', text: 'Text', mode: 2 }
           };
 
           // Map functions for bs-typeahead
@@ -111,7 +111,8 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
 
             var scopeDefaults = {
               metric: {},
-              oldTarget: _.cloneDeep(this.target)
+              oldTarget: _.cloneDeep(this.target),
+              queryOptionsText: this.renderQueryOptionsText()
             };
             _.defaults(this, scopeDefaults);
 
@@ -123,7 +124,9 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
               application: { filter: "" },
               item: { filter: "" },
               functions: [],
-              refId: "A"
+              options: {
+                showDisabledItems: false
+              }
             };
             _.defaults(target, targetDefaults);
 
@@ -152,7 +155,7 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
           key: 'initFilters',
           value: function initFilters() {
             var self = this;
-            var itemtype = self.editorModes[self.target.mode];
+            var itemtype = self.editorModes[self.target.mode].value;
             return this.$q.when(this.suggestGroups()).then(function () {
               return self.suggestHosts();
             }).then(function () {
@@ -207,7 +210,7 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
               return this.datasource.queryProcessor.filterApps(self.metric.appList, appFilter).then(function (apps) {
                 var appids = _.map(apps, 'applicationid');
                 return self.zabbix.getItems(undefined, appids, itemtype).then(function (items) {
-                  if (!self.target.showDisabledItems) {
+                  if (!self.target.options.showDisabledItems) {
                     items = _.filter(items, { 'status': '0' });
                   }
                   self.metric.itemList = items;
@@ -218,7 +221,7 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
               // Return all items belonged to selected hosts
               var hostids = _.map(self.metric.hostList, 'hostid');
               return self.zabbix.getItems(hostids, undefined, itemtype).then(function (items) {
-                if (!self.target.showDisabledItems) {
+                if (!self.target.options.showDisabledItems) {
                   items = _.filter(items, { 'status': '0' });
                 }
                 self.metric.itemList = items;
@@ -312,6 +315,37 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
               this.target.functions = _.without(this.target.functions, aliasFunc);
               this.target.functions.push(aliasFunc);
             }
+          }
+        }, {
+          key: 'toggleQueryOptions',
+          value: function toggleQueryOptions() {
+            this.showQueryOptions = !this.showQueryOptions;
+          }
+        }, {
+          key: 'onQueryOptionChange',
+          value: function onQueryOptionChange() {
+            this.queryOptionsText = this.renderQueryOptionsText();
+            this.onTargetBlur();
+          }
+        }, {
+          key: 'renderQueryOptionsText',
+          value: function renderQueryOptionsText() {
+            var optionsMap = {
+              showDisabledItems: "Show disabled items"
+            };
+            var options = [];
+            _.forOwn(this.target.options, function (value, key) {
+              if (value) {
+                if (value === true) {
+                  // Show only option name (if enabled) for boolean options
+                  options.push(optionsMap[key]);
+                } else {
+                  // Show "option = value" for another options
+                  options.push(optionsMap[key] + " = " + value);
+                }
+              }
+            });
+            return "Options: " + options.join(', ');
           }
         }, {
           key: 'switchEditorMode',

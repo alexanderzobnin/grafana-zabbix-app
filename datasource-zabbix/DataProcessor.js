@@ -242,6 +242,14 @@ System.register(['lodash', './utils'], function (_export, _context) {
             return DataProcessor.groupBy(interval, groupByCallback, datapoints);
           }
         }, {
+          key: 'aggregateByWrapper',
+          value: function aggregateByWrapper(interval, aggregateFunc, datapoints) {
+            // Flatten all points in frame and then just use groupBy()
+            var flattenedPoints = _.flatten(datapoints, true);
+            var groupByCallback = DataProcessor.aggregationFunctions[aggregateFunc];
+            return DataProcessor.groupBy(interval, groupByCallback, flattenedPoints);
+          }
+        }, {
           key: 'aggregateWrapper',
           value: function aggregateWrapper(groupByCallback, interval, datapoints) {
             var flattenedPoints = _.flatten(datapoints, true);
@@ -262,6 +270,7 @@ System.register(['lodash', './utils'], function (_export, _context) {
           get: function get() {
             return {
               groupBy: this.groupByWrapper,
+              aggregateBy: this.aggregateByWrapper,
               average: _.partial(this.aggregateWrapper, this.AVERAGE),
               min: _.partial(this.aggregateWrapper, this.MIN),
               max: _.partial(this.aggregateWrapper, this.MAX),
