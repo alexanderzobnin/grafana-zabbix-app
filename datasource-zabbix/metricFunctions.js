@@ -60,6 +60,13 @@ System.register(['lodash', 'jquery'], function (_export, _context) {
       });
 
       addFuncDef({
+        name: 'scale',
+        category: 'Transform',
+        params: [{ name: 'factor', type: 'float', options: [100, 0.01, 10, -1] }],
+        defaultParams: [100]
+      });
+
+      addFuncDef({
         name: 'sumSeries',
         category: 'Aggregate',
         params: [],
@@ -144,8 +151,15 @@ System.register(['lodash', 'jquery'], function (_export, _context) {
 
               // Bind function arguments
               var bindedFunc = func;
+              var param;
               for (var i = 0; i < this.params.length; i++) {
-                bindedFunc = _.partial(bindedFunc, this.params[i]);
+                param = this.params[i];
+
+                // Convert numeric params
+                if (this.def.params[i].type === 'int' || this.def.params[i].type === 'float') {
+                  param = Number(param);
+                }
+                bindedFunc = _.partial(bindedFunc, param);
               }
               return bindedFunc;
             } else {
@@ -159,7 +173,7 @@ System.register(['lodash', 'jquery'], function (_export, _context) {
             var parameters = _.map(this.params, function (value, index) {
 
               var paramType = this.def.params[index].type;
-              if (paramType === 'int' || paramType === 'value_or_series' || paramType === 'boolean') {
+              if (paramType === 'int' || paramType === 'float' || paramType === 'value_or_series' || paramType === 'boolean') {
                 return value;
               } else if (paramType === 'int_or_interval' && $.isNumeric(value)) {
                 return value;

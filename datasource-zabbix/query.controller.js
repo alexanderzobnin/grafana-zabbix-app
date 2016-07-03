@@ -103,6 +103,11 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
             return _this.onVariableChange();
           });
 
+          // Update metrics when item selected from dropdown
+          $scope.$on('typeahead-updated', function () {
+            _this.onTargetBlur();
+          });
+
           _this.init = function () {
             var target = this.target;
 

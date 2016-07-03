@@ -61,7 +61,7 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
   function replaceTemplateVars(templateSrv, target, scopedVars) {
     var replacedTarget = templateSrv.replace(target, scopedVars, zabbixTemplateFormat);
     if (target !== replacedTarget && !utils.regexPattern.test(replacedTarget)) {
-      replacedTarget = '/' + replacedTarget + '/';
+      replacedTarget = '/^' + replacedTarget + '$/';
     }
     return replacedTarget;
   }
@@ -260,10 +260,10 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
                 // Apply transformation functions
                 timeseries_data = _.map(timeseries_data, function (timeseries) {
 
-                  // Filter only transform functions
+                  // Filter only transformation functions
                   var transformFunctions = bindFunctionDefs(target.functions, 'Transform', DataProcessor);
 
-                  // Metric data processing
+                  // Timeseries processing
                   var dp = timeseries.datapoints;
                   for (var i = 0; i < transformFunctions.length; i++) {
                     dp = transformFunctions[i](dp);

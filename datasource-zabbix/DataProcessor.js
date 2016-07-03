@@ -50,7 +50,7 @@ System.register(['lodash', './utils'], function (_export, _context) {
     var point_index = _.indexOf(series, point);
     var nearestRight;
     for (var i = point_index; i < series.length; i++) {
-      if (series[i][0]) {
+      if (series[i][0] !== null) {
         return series[i];
       }
     }
@@ -61,7 +61,7 @@ System.register(['lodash', './utils'], function (_export, _context) {
     var point_index = _.indexOf(series, point);
     var nearestLeft;
     for (var i = point_index; i > 0; i--) {
-      if (series[i][0]) {
+      if (series[i][0] !== null) {
         return series[i];
       }
     }
@@ -236,6 +236,13 @@ System.register(['lodash', './utils'], function (_export, _context) {
             return timeseries;
           }
         }, {
+          key: 'scale',
+          value: function scale(factor, datapoints) {
+            return _.map(datapoints, function (point) {
+              return [point[0] * factor, point[1]];
+            });
+          }
+        }, {
           key: 'groupByWrapper',
           value: function groupByWrapper(interval, groupFunc, datapoints) {
             var groupByCallback = DataProcessor.aggregationFunctions[groupFunc];
@@ -270,6 +277,7 @@ System.register(['lodash', './utils'], function (_export, _context) {
           get: function get() {
             return {
               groupBy: this.groupByWrapper,
+              scale: this.scale,
               aggregateBy: this.aggregateByWrapper,
               average: _.partial(this.aggregateWrapper, this.AVERAGE),
               min: _.partial(this.aggregateWrapper, this.MIN),
