@@ -71,4 +71,26 @@
   height: 0px;
   line-height: 0px; }
 
+.ack-tooltip .drop-content {
+  max-width: 70rem !important;
+  min-width: 30rem !important; }
+
+.ack-tooltip .ack-comments {
+  width: 60%; }
+
+.ack-tooltip .ack-add-button {
+  padding-top: 1rem; }
+
+.ack-tooltip table td, .ack-tooltip th {
+  padding-right: 1rem; }
+
+.ack-tooltip .ack-input-group {
+  padding-top: 1rem; }
+  .ack-tooltip .ack-input-group input {
+    border: 1px solid;
+    border-radius: 2px;
+    width: 50%; }
+  .ack-tooltip .ack-input-group button {
+    margin-left: 1rem; }
+
 /*# sourceMappingURL=panel_triggers.css.map */

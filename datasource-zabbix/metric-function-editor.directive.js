@@ -223,7 +223,8 @@ System.register(['angular', 'lodash', 'jquery'], function (_export, _context) {
                 }
 
                 if ($target.hasClass('fa-question-circle')) {
-                  window.open("http://graphite.readthedocs.org/en/latest/functions.html#graphite.render.functions." + funcDef.name, '_blank');
+                  var docSite = "http://docs.grafana-zabbix.org/reference/functions/";
+                  window.open(docSite + '#' + funcDef.name.toLowerCase(), '_blank');
                   return;
                 }
               });

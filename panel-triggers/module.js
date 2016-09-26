@@ -1,6 +1,6 @@
 'use strict';
 
-System.register(['lodash', 'moment', '../datasource-zabbix/utils', 'app/plugins/sdk', './editor', './css/panel_triggers.css!'], function (_export, _context) {
+System.register(['lodash', 'moment', '../datasource-zabbix/utils', 'app/plugins/sdk', './editor', './ack-tooltip.directive', './css/panel_triggers.css!'], function (_export, _context) {
   var _, moment, utils, MetricsPanelCtrl, triggerPanelEditor, _createClass, defaultSeverity, panelDefaults, triggerStatusMap, defaultTimeFormat, TriggerPanelCtrl;
 
   function _classCallCheck(instance, Constructor) {
@@ -56,7 +56,7 @@ System.register(['lodash', 'moment', '../datasource-zabbix/utils', 'app/plugins/
       MetricsPanelCtrl = _appPluginsSdk.MetricsPanelCtrl;
     }, function (_editor) {
       triggerPanelEditor = _editor.triggerPanelEditor;
-    }, function (_cssPanel_triggersCss) {}],
+    }, function (_ackTooltipDirective) {}, function (_cssPanel_triggersCss) {}],
     execute: function () {
       _createClass = function () {
         function defineProperties(target, props) {
@@ -96,7 +96,8 @@ System.register(['lodash', 'moment', '../datasource-zabbix/utils', 'app/plugins/
         sortTriggersBy: { text: 'last change', value: 'lastchange' },
         showEvents: { text: 'Problems', value: '1' },
         triggerSeverity: defaultSeverity,
-        okEventColor: 'rgba(0, 245, 153, 0.45)'
+        okEventColor: 'rgba(0, 245, 153, 0.45)',
+        ackEventColor: 'rgba(0, 0, 0, 0)'
       };
       triggerStatusMap = {
         '0': 'OK',
@@ -109,13 +110,14 @@ System.register(['lodash', 'moment', '../datasource-zabbix/utils', 'app/plugins/
 
         /** @ngInject */
 
-        function TriggerPanelCtrl($scope, $injector, $q, $element, datasourceSrv, templateSrv) {
+        function TriggerPanelCtrl($scope, $injector, $q, $element, datasourceSrv, templateSrv, contextSrv) {
           _classCallCheck(this, TriggerPanelCtrl);
 
           var _this = _possibleConstructorReturn(this, Object.getPrototypeOf(TriggerPanelCtrl).call(this, $scope, $injector));
 
           _this.datasourceSrv = datasourceSrv;
           _this.templateSrv = templateSrv;
+          _this.contextSrv = contextSrv;
           _this.triggerStatusMap = triggerStatusMap;
           _this.defaultTimeFormat = defaultTimeFormat;
 
@@ -197,6 +199,7 @@ System.register(['lodash', 'moment', '../datasource-zabbix/utils', 'app/plugins/
                     // Set host that the trigger belongs
                     if (trigger.hosts.length) {
                       triggerObj.host = trigger.hosts[0].name;
+                      triggerObj.hostTechName = trigger.hosts[0].host;
                     }
 
                     // Set color
@@ -228,11 +231,20 @@ System.register(['lodash', 'moment', '../datasource-zabbix/utils', 'app/plugins/
 
                       if (event) {
                         trigger.acknowledges = _.map(event.acknowledges, function (ack) {
-                          var time = new Date(+ack.clock * 1000);
-                          ack.time = time.toLocaleString();
+                          var timestamp = moment.unix(ack.clock);
+                          if (self.panel.customLastChangeFormat) {
+                            ack.time = timestamp.format(self.panel.lastChangeFormat);
+                          } else {
+                            ack.time = timestamp.format(self.defaultTimeFormat);
+                          }
                           ack.user = ack.alias + ' (' + ack.name + ' ' + ack.surname + ')';
                           return ack;
                         });
+
+                        // Mark acknowledged triggers with different color
+                        if (self.panel.markAckEvents && trigger.acknowledges.length) {
+                          trigger.color = self.panel.ackEventColor;
+                        }
                       }
                     });
 
@@ -266,7 +278,7 @@ System.register(['lodash', 'moment', '../datasource-zabbix/utils', 'app/plugins/
                     }
 
                     // Limit triggers number
-                    self.triggerList = _.first(triggerList, self.panel.limit);
+                    self.triggerList = triggerList.slice(0, self.panel.limit);
 
                     // Notify panel that request is finished
                     self.setTimeQueryEnd();
@@ -282,9 +294,18 @@ System.register(['lodash', 'moment', '../datasource-zabbix/utils', 'app/plugins/
             trigger.showComment = !trigger.showComment;
           }
         }, {
-          key: 'switchAcknowledges',
-          value: function switchAcknowledges(trigger) {
-            trigger.showAcknowledges = !trigger.showAcknowledges;
+          key: 'acknowledgeTrigger',
+          value: function acknowledgeTrigger(trigger, message) {
+            var self = this;
+            var eventid = trigger.lastEvent.eventid;
+            var grafana_user = this.contextSrv.user.name;
+            var ack_message = grafana_user + ' (Grafana): ' + message;
+            return this.datasourceSrv.get(this.panel.datasource).then(function (datasource) {
+              var zabbix = datasource.zabbixAPI;
+              return zabbix.acknowledgeEvent(eventid, ack_message).then(function () {
+                self.refresh();
+              });
+            });
           }
         }]);
 

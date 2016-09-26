@@ -42,13 +42,14 @@ System.register(['angular', 'lodash', './utils', './zabbixAPICore.service'], fun
       _createClass(ZabbixAPI, [{
         key: 'request',
         value: function request(method, params) {
+          var _this = this;
+
           var self = this;
 
           return this.zabbixAPICore.request(this.url, method, params, this.requestOptions, this.auth).then(function (result) {
             return result;
-          },
-          // Handle API errors
-          function (error) {
+          }, function (error) {
+            // Handle API errors
             if (isNotAuthorized(error.data)) {
               return self.loginOnce().then(function () {
                 return self.request(method, params);
@@ -57,13 +58,17 @@ System.register(['angular', 'lodash', './utils', './zabbixAPICore.service'], fun
               function (error) {
                 self.alertAPIError(error.data);
               });
+            } else {
+              _this.alertSrv.set("Connection Error", error.data, 'error', 5000);
             }
           });
         }
       }, {
         key: 'alertAPIError',
         value: function alertAPIError(message) {
-          this.alertSrv.set("Zabbix API Error", message, 'error');
+          var timeout = arguments.length <= 1 || arguments[1] === undefined ? 5000 : arguments[1];
+
+          this.alertSrv.set("Zabbix API Error", message, 'error', timeout);
         }
       }, {
         key: 'loginOnce',
@@ -94,6 +99,16 @@ System.register(['angular', 'lodash', './utils', './zabbixAPICore.service'], fun
         key: 'getVersion',
         value: function getVersion() {
           return this.zabbixAPICore.getVersion(this.url, this.requestOptions);
+        }
+      }, {
+        key: 'acknowledgeEvent',
+        value: function acknowledgeEvent(eventid, message) {
+          var params = {
+            eventids: eventid,
+            message: message
+          };
+
+          return this.request('event.acknowledge', params);
         }
       }, {
         key: 'getGroups',
@@ -283,6 +298,7 @@ System.register(['angular', 'lodash', './utils', './zabbixAPICore.service'], fun
             applicationids: applicationids,
             expandDescription: true,
             expandData: true,
+            expandComment: true,
             monitored: true,
             skipDependent: true,
             //only_true: true,

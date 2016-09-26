@@ -159,7 +159,7 @@ System.register(['angular', 'lodash', './utils'], function (_export, _context) {
               var deferred = this.$q.defer();
               var historyStorage = this.storage.history;
               var full_history;
-              var expired = _.filter(_.indexBy(items, 'itemid'), function (item, itemid) {
+              var expired = _.filter(_.groupBy(items, 'itemid'), function (item, itemid) {
                 return !historyStorage[itemid];
               });
               if (expired.length) {

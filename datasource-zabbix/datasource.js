@@ -9,12 +9,10 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
     }
   }
 
-  function bindFunctionDefs(functionDefs, category, DataProcessor) {
-    'use strict';
-
+  function bindFunctionDefs(functionDefs, category) {
     var aggregationFunctions = _.map(metricFunctions.getCategories()[category], 'name');
     var aggFuncDefs = _.filter(functionDefs, function (func) {
-      return _.contains(aggregationFunctions, func.def.name);
+      return _.includes(aggregationFunctions, func.def.name);
     });
 
     return _.map(aggFuncDefs, function (func) {
@@ -23,9 +21,14 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
     });
   }
 
-  function formatMetric(metricObj) {
-    'use strict';
+  function filterFunctionDefs(funcs, category) {
+    var filteredFuncs = _.map(metricFunctions.getCategories()[category]);
+    return _.filter(funcs, function (func) {
+      return _.includes(filteredFuncs, func.def.name);
+    });
+  }
 
+  function formatMetric(metricObj) {
     return {
       text: metricObj.name,
       expandable: false
@@ -64,6 +67,30 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
       replacedTarget = '/^' + replacedTarget + '$/';
     }
     return replacedTarget;
+  }
+
+  function extractText(str, pattern, useCaptureGroups) {
+    var extractPattern = new RegExp(pattern);
+    var extractedValue = extractPattern.exec(str);
+    if (extractedValue) {
+      if (useCaptureGroups) {
+        extractedValue = extractedValue[1];
+      } else {
+        extractedValue = extractedValue[0];
+      }
+    }
+    return extractedValue;
+  }
+
+  // Apply function one by one:
+  // sequence([a(), b(), c()]) = c(b(a()));
+  function sequence(funcsArray) {
+    return function (result) {
+      for (var i = 0; i < funcsArray.length; i++) {
+        result = funcsArray[i].call(this, result);
+      }
+      return result;
+    };
   }
   return {
     setters: [function (_lodash) {
@@ -140,8 +167,6 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
 
           // Use custom format for template variables
           this.replaceTemplateVars = _.partial(replaceTemplateVars, this.templateSrv);
-
-          console.log(this.zabbixCache);
         }
 
         ////////////////////////
@@ -160,16 +185,17 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
           value: function query(options) {
             var _this = this;
 
-            var self = this;
-
-            // get from & to in seconds
             var timeFrom = Math.ceil(dateMath.parse(options.range.from) / 1000);
             var timeTo = Math.ceil(dateMath.parse(options.range.to) / 1000);
+
             var useTrendsFrom = Math.ceil(dateMath.parse('now-' + this.trendsFrom) / 1000);
-            var useTrends = timeFrom < useTrendsFrom && this.trends;
+            var useTrends = timeFrom <= useTrendsFrom && this.trends;
 
             // Create request for each target
             var promises = _.map(options.targets, function (target) {
+
+              // Prevent changes of original object
+              target = _.cloneDeep(target);
 
               if (target.mode !== 1) {
 
@@ -182,19 +208,30 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
                 }
 
                 // Replace templated variables
-                var groupFilter = _this.replaceTemplateVars(target.group.filter, options.scopedVars);
-                var hostFilter = _this.replaceTemplateVars(target.host.filter, options.scopedVars);
-                var appFilter = _this.replaceTemplateVars(target.application.filter, options.scopedVars);
-                var itemFilter = _this.replaceTemplateVars(target.item.filter, options.scopedVars);
+                target.group.filter = _this.replaceTemplateVars(target.group.filter, options.scopedVars);
+                target.host.filter = _this.replaceTemplateVars(target.host.filter, options.scopedVars);
+                target.application.filter = _this.replaceTemplateVars(target.application.filter, options.scopedVars);
+                target.item.filter = _this.replaceTemplateVars(target.item.filter, options.scopedVars);
+                target.textFilter = _this.replaceTemplateVars(target.textFilter, options.scopedVars);
+
+                _.forEach(target.functions, function (func) {
+                  func.params = _.map(func.params, function (param) {
+                    if (typeof param === 'number') {
+                      return +_this.templateSrv.replace(param.toString(), options.scopedVars);
+                    } else {
+                      return _this.templateSrv.replace(param, options.scopedVars);
+                    }
+                  });
+                });
 
                 // Query numeric data
                 if (!target.mode || target.mode === 0) {
-                  return self.queryNumericData(target, groupFilter, hostFilter, appFilter, itemFilter, timeFrom, timeTo, useTrends, options, self);
+                  return _this.queryNumericData(target, timeFrom, timeTo, useTrends);
                 }
 
                 // Query text data
                 else if (target.mode === 2) {
-                    return self.queryTextData(target, groupFilter, hostFilter, appFilter, itemFilter, timeFrom, timeTo, options, self);
+                    return _this.queryTextData(target, timeFrom, timeTo);
                   }
               }
 
@@ -206,10 +243,10 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
                   }
 
                   return _this.zabbixAPI.getSLA(target.itservice.serviceid, timeFrom, timeTo).then(function (slaObject) {
-                    return self.queryProcessor.handleSLAResponse(target.itservice, target.slaProperty, slaObject);
+                    return _this.queryProcessor.handleSLAResponse(target.itservice, target.slaProperty, slaObject);
                   });
                 }
-            }, this);
+            });
 
             // Data for panel (all targets)
             return this.q.all(_.flatten(promises)).then(_.flatten).then(function (timeseries_data) {
@@ -226,9 +263,11 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
           }
         }, {
           key: 'queryNumericData',
-          value: function queryNumericData(target, groupFilter, hostFilter, appFilter, itemFilter, timeFrom, timeTo, useTrends, options, self) {
+          value: function queryNumericData(target, timeFrom, timeTo, useTrends) {
+            var _this2 = this;
+
             // Build query in asynchronous manner
-            return self.queryProcessor.build(groupFilter, hostFilter, appFilter, itemFilter, 'num').then(function (items) {
+            return this.queryProcessor.build(target.group.filter, target.host.filter, target.application.filter, target.item.filter, 'num').then(function (items) {
               // Add hostname for items from multiple hosts
               var addHostName = utils.isRegex(target.host.filter);
               var getHistory;
@@ -239,61 +278,59 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
                 // Find trendValue() function and get specified trend value
                 var trendFunctions = _.map(metricFunctions.getCategories()['Trends'], 'name');
                 var trendValueFunc = _.find(target.functions, function (func) {
-                  return _.contains(trendFunctions, func.def.name);
+                  return _.includes(trendFunctions, func.def.name);
                 });
                 var valueType = trendValueFunc ? trendValueFunc.params[0] : "avg";
 
-                getHistory = self.zabbixAPI.getTrend(items, timeFrom, timeTo).then(function (history) {
-                  return self.queryProcessor.handleTrends(history, items, addHostName, valueType);
+                getHistory = _this2.zabbixAPI.getTrend(items, timeFrom, timeTo).then(function (history) {
+                  return _this2.queryProcessor.handleTrends(history, items, addHostName, valueType);
                 });
               }
 
               // Use history
               else {
-                  getHistory = self.zabbixCache.getHistory(items, timeFrom, timeTo).then(function (history) {
-                    return self.queryProcessor.handleHistory(history, items, addHostName);
+                  getHistory = _this2.zabbixCache.getHistory(items, timeFrom, timeTo).then(function (history) {
+                    return _this2.queryProcessor.handleHistory(history, items, addHostName);
                   });
                 }
 
               return getHistory.then(function (timeseries_data) {
+                var transformFunctions = bindFunctionDefs(target.functions, 'Transform');
+                var aggregationFunctions = bindFunctionDefs(target.functions, 'Aggregate');
+                var filterFunctions = bindFunctionDefs(target.functions, 'Filter');
+                var aliasFunctions = bindFunctionDefs(target.functions, 'Alias');
 
                 // Apply transformation functions
                 timeseries_data = _.map(timeseries_data, function (timeseries) {
-
-                  // Filter only transformation functions
-                  var transformFunctions = bindFunctionDefs(target.functions, 'Transform', DataProcessor);
-
-                  // Timeseries processing
-                  var dp = timeseries.datapoints;
-                  for (var i = 0; i < transformFunctions.length; i++) {
-                    dp = transformFunctions[i](dp);
-                  }
-                  timeseries.datapoints = dp;
-
+                  timeseries.datapoints = sequence(transformFunctions)(timeseries.datapoints);
                   return timeseries;
                 });
 
+                // Apply filter functions
+                if (filterFunctions.length) {
+                  timeseries_data = sequence(filterFunctions)(timeseries_data);
+                }
+
                 // Apply aggregations
-                var aggregationFunctions = bindFunctionDefs(target.functions, 'Aggregate', DataProcessor);
-                var dp = _.map(timeseries_data, 'datapoints');
                 if (aggregationFunctions.length) {
-                  for (var i = 0; i < aggregationFunctions.length; i++) {
-                    dp = aggregationFunctions[i](dp);
-                  }
-                  var lastAgg = _.findLast(target.functions, function (func) {
-                    return _.contains(_.map(metricFunctions.getCategories()['Aggregate'], 'name'), func.def.name);
-                  });
-                  timeseries_data = [{
-                    target: lastAgg.text,
-                    datapoints: dp
-                  }];
+                  (function () {
+                    var dp = _.map(timeseries_data, 'datapoints');
+                    dp = sequence(aggregationFunctions)(dp);
+
+                    var aggFuncNames = _.map(metricFunctions.getCategories()['Aggregate'], 'name');
+                    var lastAgg = _.findLast(target.functions, function (func) {
+                      return _.includes(aggFuncNames, func.def.name);
+                    });
+
+                    timeseries_data = [{
+                      target: lastAgg.text,
+                      datapoints: dp
+                    }];
+                  })();
                 }
 
                 // Apply alias functions
-                var aliasFunctions = bindFunctionDefs(target.functions, 'Alias', DataProcessor);
-                for (var j = 0; j < aliasFunctions.length; j++) {
-                  _.each(timeseries_data, aliasFunctions[j]);
-                }
+                _.each(timeseries_data, sequence(aliasFunctions));
 
                 return timeseries_data;
               });
@@ -301,36 +338,25 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
           }
         }, {
           key: 'queryTextData',
-          value: function queryTextData(target, groupFilter, hostFilter, appFilter, itemFilter, timeFrom, timeTo, options, self) {
-            return self.queryProcessor.build(groupFilter, hostFilter, appFilter, itemFilter, 'text').then(function (items) {
+          value: function queryTextData(target, timeFrom, timeTo) {
+            var _this3 = this;
+
+            return this.queryProcessor.build(target.group.filter, target.host.filter, target.application.filter, target.item.filter, 'text').then(function (items) {
               if (items.length) {
-                var textItemsPromises = _.map(items, function (item) {
-                  return self.zabbixAPI.getLastValue(item.itemid);
-                });
-                return self.q.all(textItemsPromises).then(function (result) {
-                  return _.map(result, function (lastvalue, index) {
-                    var extractedValue;
+                return _this3.zabbixAPI.getHistory(items, timeFrom, timeTo).then(function (history) {
+                  return _this3.queryProcessor.convertHistory(history, items, false, function (point) {
+                    var value = point.value;
+
+                    // Regex-based extractor
                     if (target.textFilter) {
-                      var text_extract_pattern = new RegExp(self.replaceTemplateVars(target.textFilter, options.scopedVars));
-                      extractedValue = text_extract_pattern.exec(lastvalue);
-                      if (extractedValue) {
-                        if (target.useCaptureGroups) {
-                          extractedValue = extractedValue[1];
-                        } else {
-                          extractedValue = extractedValue[0];
-                        }
-                      }
-                    } else {
-                      extractedValue = lastvalue;
+                      value = extractText(point.value, target.textFilter, target.useCaptureGroups);
                     }
-                    return {
-                      target: items[index].name,
-                      datapoints: [[extractedValue, timeTo * 1000]]
-                    };
+
+                    return [value, point.clock * 1000];
                   });
                 });
               } else {
-                return self.q.when([]);
+                return _this3.q.when([]);
               }
             });
           }
@@ -372,12 +398,14 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
         }, {
           key: 'metricFindQuery',
           value: function metricFindQuery(query) {
-            // Split query. Query structure:
-            // group.host.app.item
-            var self = this;
+            var _this4 = this;
+
+            var result = void 0;
             var parts = [];
+
+            // Split query. Query structure: group.host.app.item
             _.each(query.split('.'), function (part) {
-              part = self.replaceTemplateVars(part, {});
+              part = _this4.replaceTemplateVars(part, {});
 
               // Replace wildcard to regex
               if (part === '*') {
@@ -385,7 +413,7 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
               }
               parts.push(part);
             });
-            var template = _.object(['group', 'host', 'app', 'item'], parts);
+            var template = _.zipObject(['group', 'host', 'app', 'item'], parts);
 
             // Get items
             if (parts.length === 4) {
@@ -393,32 +421,23 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
               if (template.app === '/.*/') {
                 template.app = '';
               }
-              return this.queryProcessor.getItems(template.group, template.host, template.app).then(function (items) {
-                return _.map(items, formatMetric);
-              });
-            }
-            // Get applications
-            else if (parts.length === 3) {
-                return this.queryProcessor.getApps(template.group, template.host).then(function (apps) {
-                  return _.map(apps, formatMetric);
-                });
-              }
+              result = this.queryProcessor.getItems(template.group, template.host, template.app);
+            } else if (parts.length === 3) {
+              // Get applications
+              result = this.queryProcessor.getApps(template.group, template.host);
+            } else if (parts.length === 2) {
               // Get hosts
-              else if (parts.length === 2) {
-                  return this.queryProcessor.getHosts(template.group).then(function (hosts) {
-                    return _.map(hosts, formatMetric);
-                  });
-                }
-                // Get groups
-                else if (parts.length === 1) {
-                    return this.zabbixCache.getGroups(template.group).then(function (groups) {
-                      return _.map(groups, formatMetric);
-                    });
-                  }
-                  // Return empty object for invalid request
-                  else {
-                      return this.q.when([]);
-                    }
+              result = this.queryProcessor.getHosts(template.group);
+            } else if (parts.length === 1) {
+              // Get groups
+              result = this.zabbixCache.getGroups(template.group);
+            } else {
+              result = this.q.when([]);
+            }
+
+            return result.then(function (metrics) {
+              return _.map(metrics, formatMetric);
+            });
           }
         }, {
           key: 'annotationQuery',
@@ -454,7 +473,7 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
 
                 var objectids = _.map(triggers, 'triggerid');
                 return self.zabbixAPI.getEvents(objectids, timeFrom, timeTo, showOkEvents).then(function (events) {
-                  var indexedTriggers = _.indexBy(triggers, 'triggerid');
+                  var indexedTriggers = _.groupBy(triggers, 'triggerid');
 
                   // Hide acknowledged events if option enabled
                   if (annotation.hideAcknowledged) {

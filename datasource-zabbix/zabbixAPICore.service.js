@@ -105,7 +105,10 @@ System.register(['angular'], function (_export, _context) {
                 }
 
               deferred.resolve(response.data.result);
+            }, function (error) {
+              deferred.reject(error.err);
             });
+
             return deferred.promise;
           }
         }, {

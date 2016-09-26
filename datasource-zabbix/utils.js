@@ -51,7 +51,7 @@ System.register(['lodash', 'moment'], function (_export, _context) {
           var variables = _.map(templateVariables, function (variable) {
             return '$' + variable.name;
           });
-          return _.contains(variables, str);
+          return _.includes(variables, str);
         } else {
           return false;
         }

@@ -49,6 +49,7 @@ System.register(['lodash', 'jquery'], function (_export, _context) {
       categories = {
         Transform: [],
         Aggregate: [],
+        Filter: [],
         Trends: [],
         Alias: []
       };
@@ -64,6 +65,13 @@ System.register(['lodash', 'jquery'], function (_export, _context) {
         category: 'Transform',
         params: [{ name: 'factor', type: 'float', options: [100, 0.01, 10, -1] }],
         defaultParams: [100]
+      });
+
+      addFuncDef({
+        name: 'delta',
+        category: 'Transform',
+        params: [],
+        defaultParams: []
       });
 
       addFuncDef({
@@ -106,6 +114,20 @@ System.register(['lodash', 'jquery'], function (_export, _context) {
         category: 'Aggregate',
         params: [{ name: 'interval', type: 'string' }, { name: 'function', type: 'string', options: ['avg', 'min', 'max', 'median'] }],
         defaultParams: ['1m', 'avg']
+      });
+
+      addFuncDef({
+        name: 'top',
+        category: 'Filter',
+        params: [{ name: 'number', type: 'int' }, { name: 'value', type: 'string', options: ['avg', 'min', 'max', 'median'] }],
+        defaultParams: [5, 'avg']
+      });
+
+      addFuncDef({
+        name: 'bottom',
+        category: 'Filter',
+        params: [{ name: 'number', type: 'int' }, { name: 'value', type: 'string', options: ['avg', 'min', 'max', 'median'] }],
+        defaultParams: [5, 'avg']
       });
 
       addFuncDef({
