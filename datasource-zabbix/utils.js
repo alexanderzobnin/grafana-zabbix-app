@@ -120,7 +120,13 @@ System.register(['lodash', 'moment'], function (_export, _context) {
         }
       }
 
+      // Fix for backward compatibility with lodash 2.4
+
       _export('convertToZabbixAPIUrl', convertToZabbixAPIUrl);
+
+      if (!_.includes) {
+        _.includes = _.contains;
+      }
     }
   };
 });

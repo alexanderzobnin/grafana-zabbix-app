@@ -21,13 +21,6 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
     });
   }
 
-  function filterFunctionDefs(funcs, category) {
-    var filteredFuncs = _.map(metricFunctions.getCategories()[category]);
-    return _.filter(funcs, function (func) {
-      return _.includes(filteredFuncs, func.def.name);
-    });
-  }
-
   function formatMetric(metricObj) {
     return {
       text: metricObj.name,
@@ -45,7 +38,7 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
    * template variables, for example
    * /CPU $cpu_item.*time/ where $cpu_item is system,user,iowait
    */
-  function zabbixTemplateFormat(value, variable) {
+  function zabbixTemplateFormat(value) {
     if (typeof value === 'string') {
       return utils.escapeRegex(value);
     }
@@ -54,7 +47,8 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
     return '(' + escapedValues.join('|') + ')';
   }
 
-  /** If template variables are used in request, replace it using regex format
+  /**
+   * If template variables are used in request, replace it using regex format
    * and wrap with '/' for proper multi-value work. Example:
    * $variable selected as a, b, c
    * We use filter $variable
@@ -92,6 +86,8 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
       return result;
     };
   }
+
+  // Fix for backward compatibility with lodash 2.4
   return {
     setters: [function (_lodash) {
       _ = _lodash.default;
@@ -509,6 +505,10 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
       }());
 
       _export('ZabbixAPIDatasource', ZabbixAPIDatasource);
+
+      if (!_.includes) {
+        _.includes = _.contains;
+      }
     }
   };
 });

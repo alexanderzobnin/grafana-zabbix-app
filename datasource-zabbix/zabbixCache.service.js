@@ -1,7 +1,7 @@
 'use strict';
 
-System.register(['angular', 'lodash', './utils'], function (_export, _context) {
-  var angular, _, utils, _createClass;
+System.register(['angular', 'lodash'], function (_export, _context) {
+  var angular, _, _createClass;
 
   function _classCallCheck(instance, Constructor) {
     if (!(instance instanceof Constructor)) {
@@ -25,8 +25,6 @@ System.register(['angular', 'lodash', './utils'], function (_export, _context) {
       angular = _angular.default;
     }, function (_lodash) {
       _ = _lodash.default;
-    }, function (_utils) {
-      utils = _utils;
     }],
     execute: function () {
       _createClass = function () {

@@ -1,7 +1,7 @@
 'use strict';
 
-System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', './migrations', './add-metric-function.directive', './metric-function-editor.directive', './css/query-editor.css!'], function (_export, _context) {
-  var QueryCtrl, _, utils, metricFunctions, migrations, _createClass, ZabbixQueryController;
+System.register(['app/plugins/sdk', 'angular', 'lodash', './utils', './metricFunctions', './migrations', './add-metric-function.directive', './metric-function-editor.directive', './css/query-editor.css!'], function (_export, _context) {
+  var QueryCtrl, angular, _, utils, metricFunctions, migrations, _createClass, ZabbixQueryController;
 
   function _classCallCheck(instance, Constructor) {
     if (!(instance instanceof Constructor)) {
@@ -40,6 +40,8 @@ System.register(['app/plugins/sdk', 'lodash', './utils', './metricFunctions', '.
   return {
     setters: [function (_appPluginsSdk) {
       QueryCtrl = _appPluginsSdk.QueryCtrl;
+    }, function (_angular) {
+      angular = _angular.default;
     }, function (_lodash) {
       _ = _lodash.default;
     }, function (_utils) {
