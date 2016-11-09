@@ -38,14 +38,7 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
    * template variables, for example
    * /CPU $cpu_item.*time/ where $cpu_item is system,user,iowait
    */
-  function zabbixTemplateFormat(value) {
-    if (typeof value === 'string') {
-      return utils.escapeRegex(value);
-    }
 
-    var escapedValues = _.map(value, utils.escapeRegex);
-    return '(' + escapedValues.join('|') + ')';
-  }
 
   /**
    * If template variables are used in request, replace it using regex format
@@ -57,7 +50,7 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
    */
   function replaceTemplateVars(templateSrv, target, scopedVars) {
     var replacedTarget = templateSrv.replace(target, scopedVars, zabbixTemplateFormat);
-    if (target !== replacedTarget && !utils.regexPattern.test(replacedTarget)) {
+    if (target !== replacedTarget && !utils.isRegex(replacedTarget)) {
       replacedTarget = '/^' + replacedTarget + '$/';
     }
     return replacedTarget;
@@ -359,9 +352,10 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
         }, {
           key: 'testDatasource',
           value: function testDatasource() {
-            var self = this;
+            var _this4 = this;
+
             return this.zabbixAPI.getVersion().then(function (version) {
-              return self.zabbixAPI.login().then(function (auth) {
+              return _this4.zabbixAPI.login().then(function (auth) {
                 if (auth) {
                   return {
                     status: "success",
@@ -394,14 +388,14 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
         }, {
           key: 'metricFindQuery',
           value: function metricFindQuery(query) {
-            var _this4 = this;
+            var _this5 = this;
 
             var result = void 0;
             var parts = [];
 
             // Split query. Query structure: group.host.app.item
             _.each(query.split('.'), function (part) {
-              part = _this4.replaceTemplateVars(part, {});
+              part = _this5.replaceTemplateVars(part, {});
 
               // Replace wildcard to regex
               if (part === '*') {
@@ -438,6 +432,8 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
         }, {
           key: 'annotationQuery',
           value: function annotationQuery(options) {
+            var _this6 = this;
+
             var timeFrom = Math.ceil(dateMath.parse(options.rangeRaw.from) / 1000);
             var timeTo = Math.ceil(dateMath.parse(options.rangeRaw.to) / 1000);
             var annotation = options.annotation;
@@ -447,9 +443,9 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
             var showTriggers = [0, 1];
 
             var buildQuery = this.queryProcessor.buildTriggerQuery(this.replaceTemplateVars(annotation.group, {}), this.replaceTemplateVars(annotation.host, {}), this.replaceTemplateVars(annotation.application, {}));
-            var self = this;
+
             return buildQuery.then(function (query) {
-              return self.zabbixAPI.getTriggers(query.groupids, query.hostids, query.applicationids, showTriggers, timeFrom, timeTo).then(function (triggers) {
+              return _this6.zabbixAPI.getTriggers(query.groupids, query.hostids, query.applicationids, showTriggers).then(function (triggers) {
 
                 // Filter triggers by description
                 if (utils.isRegex(annotation.trigger)) {
@@ -468,8 +464,8 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
                 });
 
                 var objectids = _.map(triggers, 'triggerid');
-                return self.zabbixAPI.getEvents(objectids, timeFrom, timeTo, showOkEvents).then(function (events) {
-                  var indexedTriggers = _.groupBy(triggers, 'triggerid');
+                return _this6.zabbixAPI.getEvents(objectids, timeFrom, timeTo, showOkEvents).then(function (events) {
+                  var indexedTriggers = _.keyBy(triggers, 'triggerid');
 
                   // Hide acknowledged events if option enabled
                   if (annotation.hideAcknowledged) {
@@ -479,19 +475,20 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
                   }
 
                   return _.map(events, function (event) {
-                    var title = '';
+                    var tags = void 0;
                     if (annotation.showHostname) {
-                      title += event.hosts[0].name + ': ';
+                      tags = _.map(event.hosts, 'name');
                     }
 
                     // Show event type (OK or Problem)
-                    title += Number(event.value) ? 'Problem' : 'OK';
+                    var title = Number(event.value) ? 'Problem' : 'OK';
 
                     var formatted_acknowledges = utils.formatAcknowledges(event.acknowledges);
                     return {
                       annotation: annotation,
                       time: event.clock * 1000,
                       title: title,
+                      tags: tags,
                       text: indexedTriggers[event.objectid].description + formatted_acknowledges
                     };
                   });
@@ -506,8 +503,21 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
 
       _export('ZabbixAPIDatasource', ZabbixAPIDatasource);
 
+      function zabbixTemplateFormat(value) {
+        if (typeof value === 'string') {
+          return utils.escapeRegex(value);
+        }
+
+        var escapedValues = _.map(value, utils.escapeRegex);
+        return '(' + escapedValues.join('|') + ')';
+      }
+      _export('zabbixTemplateFormat', zabbixTemplateFormat);
+
       if (!_.includes) {
         _.includes = _.contains;
+      }
+      if (!_.keyBy) {
+        _.keyBy = _.indexBy;
       }
     }
   };

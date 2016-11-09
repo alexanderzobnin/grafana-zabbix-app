@@ -157,7 +157,7 @@ System.register(['angular', 'lodash'], function (_export, _context) {
               var deferred = this.$q.defer();
               var historyStorage = this.storage.history;
               var full_history;
-              var expired = _.filter(_.groupBy(items, 'itemid'), function (item, itemid) {
+              var expired = _.filter(_.keyBy(items, 'itemid'), function (item, itemid) {
                 return !historyStorage[itemid];
               });
               if (expired.length) {
@@ -272,6 +272,11 @@ System.register(['angular', 'lodash'], function (_export, _context) {
         }
         return hash;
       };
+
+      // Fix for backward compatibility with lodash 2.4
+      if (!_.keyBy) {
+        _.keyBy = _.indexBy;
+      }
     }
   };
 });
