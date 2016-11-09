@@ -38,7 +38,14 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
    * template variables, for example
    * /CPU $cpu_item.*time/ where $cpu_item is system,user,iowait
    */
+  function zabbixTemplateFormat(value) {
+    if (typeof value === 'string') {
+      return utils.escapeRegex(value);
+    }
 
+    var escapedValues = _.map(value, utils.escapeRegex);
+    return '(' + escapedValues.join('|') + ')';
+  }
 
   /**
    * If template variables are used in request, replace it using regex format
@@ -80,7 +87,6 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
     };
   }
 
-  // Fix for backward compatibility with lodash 2.4
   return {
     setters: [function (_lodash) {
       _ = _lodash.default;
@@ -503,16 +509,9 @@ System.register(['lodash', 'app/core/utils/datemath', './utils', './migrations',
 
       _export('ZabbixAPIDatasource', ZabbixAPIDatasource);
 
-      function zabbixTemplateFormat(value) {
-        if (typeof value === 'string') {
-          return utils.escapeRegex(value);
-        }
-
-        var escapedValues = _.map(value, utils.escapeRegex);
-        return '(' + escapedValues.join('|') + ')';
-      }
       _export('zabbixTemplateFormat', zabbixTemplateFormat);
 
+      // Fix for backward compatibility with lodash 2.4
       if (!_.includes) {
         _.includes = _.contains;
       }

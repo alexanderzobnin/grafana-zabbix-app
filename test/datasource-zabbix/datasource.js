@@ -3,12 +3,10 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.ZabbixAPIDatasource = undefined;
+exports.zabbixTemplateFormat = exports.ZabbixAPIDatasource = undefined;
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }(); //import angular from 'angular';
 
-
-exports.zabbixTemplateFormat = zabbixTemplateFormat;
 
 var _lodash = require('lodash');
 
@@ -46,7 +44,7 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var ZabbixAPIDatasource = exports.ZabbixAPIDatasource = function () {
+var ZabbixAPIDatasource = function () {
 
   /** @ngInject */
 
@@ -535,7 +533,11 @@ function sequence(funcsArray) {
   };
 }
 
+exports.ZabbixAPIDatasource = ZabbixAPIDatasource;
+exports.zabbixTemplateFormat = zabbixTemplateFormat;
+
 // Fix for backward compatibility with lodash 2.4
+
 if (!_lodash2.default.includes) {
   _lodash2.default.includes = _lodash2.default.contains;
 }
