@@ -1,5 +1,10 @@
 'use strict';
 
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.ZabbixAPIError = undefined;
+
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }(); /**
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       * General Zabbix API methods
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       */
@@ -16,10 +21,9 @@ var ZabbixAPICoreService = function () {
 
   /** @ngInject */
 
-  function ZabbixAPICoreService($q, backendSrv) {
+  function ZabbixAPICoreService(backendSrv) {
     _classCallCheck(this, ZabbixAPICoreService);
 
-    this.$q = $q;
     this.backendSrv = backendSrv;
   }
 
@@ -32,7 +36,6 @@ var ZabbixAPICoreService = function () {
   _createClass(ZabbixAPICoreService, [{
     key: 'request',
     value: function request(api_url, method, params, options, auth) {
-      var deferred = this.$q.defer();
       var requestData = {
         jsonrpc: '2.0',
         method: method,
@@ -42,8 +45,7 @@ var ZabbixAPICoreService = function () {
 
       if (auth === "") {
         // Reject immediately if not authenticated
-        deferred.reject({ data: "Not authorised." });
-        return deferred.promise;
+        return Promise.reject(new ZabbixAPIError({ data: "Not authorised." }));
       } else if (auth) {
         // Set auth parameter only if it needed
         requestData.auth = auth;
@@ -51,11 +53,11 @@ var ZabbixAPICoreService = function () {
 
       var requestOptions = {
         method: 'POST',
+        url: api_url,
+        data: requestData,
         headers: {
           'Content-Type': 'application/json'
-        },
-        url: api_url,
-        data: requestData
+        }
       };
 
       // Set request options for basic auth
@@ -66,23 +68,23 @@ var ZabbixAPICoreService = function () {
         requestOptions.headers.Authorization = options.basicAuth;
       }
 
-      this.backendSrv.datasourceRequest(requestOptions).then(function (response) {
-        // General connection issues
+      return this.datasourceRequest(requestOptions);
+    }
+  }, {
+    key: 'datasourceRequest',
+    value: function datasourceRequest(requestOptions) {
+      return this.backendSrv.datasourceRequest(requestOptions).then(function (response) {
         if (!response.data) {
-          deferred.reject(response);
+          return Promise.reject(new ZabbixAPIError({ data: "General Error, no data" }));
+        } else if (response.data.error) {
+
+          // Handle Zabbix API errors
+          return Promise.reject(new ZabbixAPIError(response.data.error));
         }
 
-        // Handle Zabbix API errors
-        else if (response.data.error) {
-            deferred.reject(response.data.error);
-          }
-
-        deferred.resolve(response.data.result);
-      }, function (error) {
-        deferred.reject(error.err);
+        // Success
+        return response.data.result;
       });
-
-      return deferred.promise;
     }
 
     /**
@@ -118,14 +120,24 @@ var ZabbixAPICoreService = function () {
 // Define zabbix API exception type
 
 
-function ZabbixException(error) {
-  this.code = error.code;
-  this.errorType = error.message;
-  this.message = error.data;
-}
+var ZabbixAPIError = exports.ZabbixAPIError = function () {
+  function ZabbixAPIError(error) {
+    _classCallCheck(this, ZabbixAPIError);
 
-ZabbixException.prototype.toString = function () {
-  return this.errorType + ": " + this.message;
-};
+    this.code = error.code;
+    this.name = error.data;
+    this.message = error.data;
+    this.data = error.data;
+  }
+
+  _createClass(ZabbixAPIError, [{
+    key: 'toString',
+    value: function toString() {
+      return this.name + ": " + this.message;
+    }
+  }]);
+
+  return ZabbixAPIError;
+}();
 
 _angular2.default.module('grafana.services').service('zabbixAPICoreService', ZabbixAPICoreService);

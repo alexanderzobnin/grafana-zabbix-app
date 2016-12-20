@@ -10,8 +10,10 @@ exports.isTemplateVariable = isTemplateVariable;
 exports.buildRegex = buildRegex;
 exports.escapeRegex = escapeRegex;
 exports.parseInterval = parseInterval;
+exports.parseTimeShiftInterval = parseTimeShiftInterval;
 exports.formatAcknowledges = formatAcknowledges;
 exports.convertToZabbixAPIUrl = convertToZabbixAPIUrl;
+exports.callOnce = callOnce;
 
 var _lodash = require('lodash');
 
@@ -81,6 +83,20 @@ function parseInterval(interval) {
   return _moment2.default.duration(Number(momentInterval[1]), momentInterval[2]).valueOf();
 }
 
+function parseTimeShiftInterval(interval) {
+  var intervalPattern = /^([\+\-]*)([\d]+)(y|M|w|d|h|m|s)/g;
+  var momentInterval = intervalPattern.exec(interval);
+  var duration = 0;
+
+  if (momentInterval[1] === '+') {
+    duration = 0 - _moment2.default.duration(Number(momentInterval[2]), momentInterval[3]).valueOf();
+  } else {
+    duration = _moment2.default.duration(Number(momentInterval[2]), momentInterval[3]).valueOf();
+  }
+
+  return duration;
+}
+
 /**
  * Format acknowledges.
  *
@@ -111,6 +127,22 @@ function convertToZabbixAPIUrl(url) {
   } else {
     return url.replace(trimSlashPattern, "$1");
   }
+}
+
+/**
+ * Wrap function to prevent multiple calls
+ * when waiting for result.
+ */
+function callOnce(func, promiseKeeper) {
+  return function () {
+    if (!promiseKeeper) {
+      promiseKeeper = Promise.resolve(func.apply(this, arguments).then(function (result) {
+        promiseKeeper = null;
+        return result;
+      }));
+    }
+    return promiseKeeper;
+  };
 }
 
 // Fix for backward compatibility with lodash 2.4

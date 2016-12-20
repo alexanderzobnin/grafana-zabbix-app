@@ -31,14 +31,11 @@ describe('ZabbixDatasource', function () {
         trendsFrom: '7d'
       }
     };
-    ctx.$q = _q2.default;
     ctx.templateSrv = {};
     ctx.alertSrv = {};
-    ctx.zabbixAPIService = function () {};
-    ctx.ZabbixCachingProxy = function () {};
-    ctx.QueryProcessor = function () {};
+    ctx.zabbix = function () {};
 
-    ctx.ds = new _module.Datasource(ctx.instanceSettings, ctx.$q, ctx.templateSrv, ctx.alertSrv, ctx.zabbixAPIService, ctx.ZabbixCachingProxy, ctx.QueryProcessor);
+    ctx.ds = new _module.Datasource(ctx.instanceSettings, ctx.templateSrv, ctx.alertSrv, ctx.zabbix);
   });
 
   describe('When querying data', function () {
@@ -156,12 +153,7 @@ describe('ZabbixDatasource', function () {
       ctx.ds.replaceTemplateVars = function (str) {
         return str;
       };
-      ctx.ds.zabbixCache = {
-        getGroups: function getGroups() {
-          return _q2.default.when([]);
-        }
-      };
-      ctx.ds.queryProcessor = {
+      ctx.ds.zabbix = {
         getGroups: function getGroups() {
           return _q2.default.when([]);
         },
@@ -180,7 +172,7 @@ describe('ZabbixDatasource', function () {
     it('should return groups', function (done) {
       var tests = [{ query: '*', expect: '/.*/' }, { query: '', expect: '' }, { query: 'Backend', expect: 'Backend' }, { query: 'Back*', expect: 'Back*' }];
 
-      var getGroups = _sinon2.default.spy(ctx.ds.zabbixCache, 'getGroups');
+      var getGroups = _sinon2.default.spy(ctx.ds.zabbix, 'getGroups');
       var _iteratorNormalCompletion = true;
       var _didIteratorError = false;
       var _iteratorError = undefined;
@@ -214,7 +206,7 @@ describe('ZabbixDatasource', function () {
     it('should return hosts', function (done) {
       var tests = [{ query: '*.*', expect: '/.*/' }, { query: '.', expect: '' }, { query: 'Backend.*', expect: 'Backend' }, { query: 'Back*.', expect: 'Back*' }];
 
-      var getHosts = _sinon2.default.spy(ctx.ds.queryProcessor, 'getHosts');
+      var getHosts = _sinon2.default.spy(ctx.ds.zabbix, 'getHosts');
       var _iteratorNormalCompletion2 = true;
       var _didIteratorError2 = false;
       var _iteratorError2 = undefined;
@@ -248,7 +240,7 @@ describe('ZabbixDatasource', function () {
     it('should return applications', function (done) {
       var tests = [{ query: '*.*.*', expect: ['/.*/', '/.*/'] }, { query: '.*.', expect: ['', '/.*/'] }, { query: 'Backend.backend01.*', expect: ['Backend', 'backend01'] }, { query: 'Back*.*.', expect: ['Back*', '/.*/'] }];
 
-      var getApps = _sinon2.default.spy(ctx.ds.queryProcessor, 'getApps');
+      var getApps = _sinon2.default.spy(ctx.ds.zabbix, 'getApps');
       var _iteratorNormalCompletion3 = true;
       var _didIteratorError3 = false;
       var _iteratorError3 = undefined;
@@ -282,7 +274,7 @@ describe('ZabbixDatasource', function () {
     it('should return items', function (done) {
       var tests = [{ query: '*.*.*.*', expect: ['/.*/', '/.*/', ''] }, { query: '.*.*.*', expect: ['', '/.*/', ''] }, { query: 'Backend.backend01.*.*', expect: ['Backend', 'backend01', ''] }, { query: 'Back*.*.cpu.*', expect: ['Back*', '/.*/', 'cpu'] }];
 
-      var getItems = _sinon2.default.spy(ctx.ds.queryProcessor, 'getItems');
+      var getItems = _sinon2.default.spy(ctx.ds.zabbix, 'getItems');
       var _iteratorNormalCompletion4 = true;
       var _didIteratorError4 = false;
       var _iteratorError4 = undefined;
@@ -316,7 +308,7 @@ describe('ZabbixDatasource', function () {
     it('should invoke method with proper arguments', function (done) {
       var query = '*.*';
 
-      var getHosts = _sinon2.default.spy(ctx.ds.queryProcessor, 'getHosts');
+      var getHosts = _sinon2.default.spy(ctx.ds.zabbix, 'getHosts');
       ctx.ds.metricFindQuery(query);
       expect(getHosts).to.have.been.calledWith('/.*/');
       done();

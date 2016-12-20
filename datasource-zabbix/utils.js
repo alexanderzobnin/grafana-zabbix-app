@@ -83,6 +83,22 @@ System.register(['lodash', 'moment'], function (_export, _context) {
         return moment.duration(Number(momentInterval[1]), momentInterval[2]).valueOf();
       }
 
+      _export('parseInterval', parseInterval);
+
+      function parseTimeShiftInterval(interval) {
+        var intervalPattern = /^([\+\-]*)([\d]+)(y|M|w|d|h|m|s)/g;
+        var momentInterval = intervalPattern.exec(interval);
+        var duration = 0;
+
+        if (momentInterval[1] === '+') {
+          duration = 0 - moment.duration(Number(momentInterval[2]), momentInterval[3]).valueOf();
+        } else {
+          duration = moment.duration(Number(momentInterval[2]), momentInterval[3]).valueOf();
+        }
+
+        return duration;
+      }
+
       /**
        * Format acknowledges.
        *
@@ -90,7 +106,7 @@ System.register(['lodash', 'moment'], function (_export, _context) {
        * @return {string} HTML-formatted table
        */
 
-      _export('parseInterval', parseInterval);
+      _export('parseTimeShiftInterval', parseTimeShiftInterval);
 
       function formatAcknowledges(acknowledges) {
         if (acknowledges.length) {
@@ -120,9 +136,28 @@ System.register(['lodash', 'moment'], function (_export, _context) {
         }
       }
 
-      // Fix for backward compatibility with lodash 2.4
+      /**
+       * Wrap function to prevent multiple calls
+       * when waiting for result.
+       */
 
       _export('convertToZabbixAPIUrl', convertToZabbixAPIUrl);
+
+      function callOnce(func, promiseKeeper) {
+        return function () {
+          if (!promiseKeeper) {
+            promiseKeeper = Promise.resolve(func.apply(this, arguments).then(function (result) {
+              promiseKeeper = null;
+              return result;
+            }));
+          }
+          return promiseKeeper;
+        };
+      }
+
+      // Fix for backward compatibility with lodash 2.4
+
+      _export('callOnce', callOnce);
 
       if (!_.includes) {
         _.includes = _.contains;

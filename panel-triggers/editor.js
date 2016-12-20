@@ -43,7 +43,7 @@ System.register(['lodash', '../datasource-zabbix/utils', '../datasource-zabbix/c
 
         /** @ngInject */
 
-        function TriggerPanelEditorCtrl($scope, $rootScope, $q, uiSegmentSrv, datasourceSrv, templateSrv, popoverSrv) {
+        function TriggerPanelEditorCtrl($scope, $rootScope, uiSegmentSrv, datasourceSrv, templateSrv, popoverSrv) {
           var _this = this;
 
           _classCallCheck(this, TriggerPanelEditorCtrl);
@@ -52,7 +52,6 @@ System.register(['lodash', '../datasource-zabbix/utils', '../datasource-zabbix/c
           this.panelCtrl = $scope.ctrl;
           this.panel = this.panelCtrl.panel;
 
-          this.$q = $q;
           this.datasourceSrv = datasourceSrv;
           this.templateSrv = templateSrv;
           this.popoverSrv = popoverSrv;
@@ -81,8 +80,6 @@ System.register(['lodash', '../datasource-zabbix/utils', '../datasource-zabbix/c
           };
           _.defaults(this, scopeDefaults);
 
-          var self = this;
-
           // Get zabbix data sources
           var datasources = _.filter(this.datasourceSrv.getMetricSources(), function (datasource) {
             return datasource.meta.id === 'alexanderzobnin-zabbix-datasource';
@@ -95,54 +92,49 @@ System.register(['lodash', '../datasource-zabbix/utils', '../datasource-zabbix/c
           }
           // Load datasource
           this.datasourceSrv.get(this.panel.datasource).then(function (datasource) {
-            self.datasource = datasource;
-            self.initFilters();
-            self.panelCtrl.refresh();
+            _this.datasource = datasource;
+            _this.queryBuilder = datasource.queryBuilder;
+            _this.initFilters();
+            _this.panelCtrl.refresh();
           });
         }
 
         _createClass(TriggerPanelEditorCtrl, [{
           key: 'initFilters',
           value: function initFilters() {
-            var self = this;
-            return this.$q.when(this.suggestGroups()).then(function () {
-              return self.suggestHosts();
-            }).then(function () {
-              return self.suggestApps();
-            });
+            return Promise.all([this.suggestGroups(), this.suggestHosts(), this.suggestApps()]);
           }
         }, {
           key: 'suggestGroups',
           value: function suggestGroups() {
-            var self = this;
-            return this.datasource.zabbixCache.getGroups().then(function (groups) {
-              self.metric.groupList = groups;
+            var _this2 = this;
+
+            return this.queryBuilder.getAllGroups().then(function (groups) {
+              _this2.metric.groupList = groups;
               return groups;
             });
           }
         }, {
           key: 'suggestHosts',
           value: function suggestHosts() {
-            var self = this;
+            var _this3 = this;
+
             var groupFilter = this.datasource.replaceTemplateVars(this.panel.triggers.group.filter);
-            return this.datasource.queryProcessor.filterGroups(self.metric.groupList, groupFilter).then(function (groups) {
-              var groupids = _.map(groups, 'groupid');
-              return self.datasource.zabbixAPI.getHosts(groupids).then(function (hosts) {
-                self.metric.hostList = hosts;
-                return hosts;
-              });
+            return this.queryBuilder.getAllHosts(groupFilter).then(function (hosts) {
+              _this3.metric.hostList = hosts;
+              return hosts;
             });
           }
         }, {
           key: 'suggestApps',
           value: function suggestApps() {
-            var self = this;
+            var _this4 = this;
+
+            var groupFilter = this.datasource.replaceTemplateVars(this.panel.triggers.group.filter);
             var hostFilter = this.datasource.replaceTemplateVars(this.panel.triggers.host.filter);
-            return this.datasource.queryProcessor.filterHosts(self.metric.hostList, hostFilter).then(function (hosts) {
-              var hostids = _.map(hosts, 'hostid');
-              return self.datasource.zabbixAPI.getApps(hostids).then(function (apps) {
-                return self.metric.appList = apps;
-              });
+            return this.queryBuilder.getAllApps(groupFilter, hostFilter).then(function (apps) {
+              _this4.metric.appList = apps;
+              return apps;
             });
           }
         }, {

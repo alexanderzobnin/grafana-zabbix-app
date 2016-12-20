@@ -16,8 +16,8 @@
     },
     "keywords": ["zabbix"],
     "logos": {
-      "small": "img/zabbix_logo_200.png",
-      "large": "img/zabbix_logo_400.png"
+      "small": "img/zabbix_app_logo.svg",
+      "large": "img/zabbix_app_logo.svg"
     },
     "links": [
       {"name": "GitHub", "url": "https://github.com/alexanderzobnin/grafana-zabbix"},
@@ -31,8 +31,8 @@
       {"name": "Metric Editor", "path": "img/screenshot-metric_editor.png"},
       {"name": "Triggers", "path": "img/screenshot-triggers.png"}
     ],
-    "version": "3.1.2",
-    "updated": "2016-11-09"
+    "version": "3.2.0",
+    "updated": "2016-12-20"
   },
 
   "includes": [

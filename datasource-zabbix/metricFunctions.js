@@ -20,6 +20,8 @@ System.register(['lodash', 'jquery'], function (_export, _context) {
     index[funcDef.shortName || funcDef.name] = funcDef;
   }
 
+  // Transform
+
   return {
     setters: [function (_lodash) {
       _ = _lodash.default;
@@ -51,6 +53,7 @@ System.register(['lodash', 'jquery'], function (_export, _context) {
         Aggregate: [],
         Filter: [],
         Trends: [],
+        Time: [],
         Alias: []
       };
       addFuncDef({
@@ -73,6 +76,8 @@ System.register(['lodash', 'jquery'], function (_export, _context) {
         params: [],
         defaultParams: []
       });
+
+      // Aggregate
 
       addFuncDef({
         name: 'sumSeries',
@@ -116,6 +121,8 @@ System.register(['lodash', 'jquery'], function (_export, _context) {
         defaultParams: ['1m', 'avg']
       });
 
+      // Filter
+
       addFuncDef({
         name: 'top',
         category: 'Filter',
@@ -130,11 +137,22 @@ System.register(['lodash', 'jquery'], function (_export, _context) {
         defaultParams: [5, 'avg']
       });
 
+      // Trends
+
       addFuncDef({
         name: 'trendValue',
         category: 'Trends',
         params: [{ name: 'type', type: 'string', options: ['avg', 'min', 'max'] }],
         defaultParams: ['avg']
+      });
+
+      // Time
+
+      addFuncDef({
+        name: 'timeShift',
+        category: 'Time',
+        params: [{ name: 'interval', type: 'string', options: ['24h', '7d', '1M', '+24h', '-24h'] }],
+        defaultParams: ['24h']
       });
 
       addFuncDef({

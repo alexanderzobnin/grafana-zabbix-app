@@ -75,14 +75,12 @@ System.register(['app/plugins/sdk', 'angular', 'lodash', './utils', './metricFun
 
         // ZabbixQueryCtrl constructor
 
-        function ZabbixQueryController($scope, $injector, $rootScope, $sce, $q, templateSrv) {
+        function ZabbixQueryController($scope, $injector, $rootScope, $sce, templateSrv) {
           _classCallCheck(this, ZabbixQueryController);
 
           var _this = _possibleConstructorReturn(this, Object.getPrototypeOf(ZabbixQueryController).call(this, $scope, $injector));
 
-          _this.zabbix = _this.datasource.zabbixAPI;
-          _this.cache = _this.datasource.zabbixCache;
-          _this.$q = $q;
+          _this.zabbix = _this.datasource.zabbix;
 
           // Use custom format for template variables
           _this.replaceTemplateVars = _this.datasource.replaceTemplateVars;
@@ -161,80 +159,61 @@ System.register(['app/plugins/sdk', 'angular', 'lodash', './utils', './metricFun
         _createClass(ZabbixQueryController, [{
           key: 'initFilters',
           value: function initFilters() {
-            var self = this;
-            var itemtype = self.editorModes[self.target.mode].value;
-            return this.$q.when(this.suggestGroups()).then(function () {
-              return self.suggestHosts();
-            }).then(function () {
-              return self.suggestApps();
-            }).then(function () {
-              return self.suggestItems(itemtype);
-            });
+            var itemtype = this.editorModes[this.target.mode].value;
+            return Promise.all([this.suggestGroups(), this.suggestHosts(), this.suggestApps(), this.suggestItems(itemtype)]);
           }
         }, {
           key: 'suggestGroups',
           value: function suggestGroups() {
-            var self = this;
-            return this.cache.getGroups().then(function (groups) {
-              self.metric.groupList = groups;
+            var _this2 = this;
+
+            return this.zabbix.getAllGroups().then(function (groups) {
+              _this2.metric.groupList = groups;
               return groups;
             });
           }
         }, {
           key: 'suggestHosts',
           value: function suggestHosts() {
-            var self = this;
+            var _this3 = this;
+
             var groupFilter = this.replaceTemplateVars(this.target.group.filter);
-            return this.datasource.queryProcessor.filterGroups(self.metric.groupList, groupFilter).then(function (groups) {
-              var groupids = _.map(groups, 'groupid');
-              return self.zabbix.getHosts(groupids).then(function (hosts) {
-                self.metric.hostList = hosts;
-                return hosts;
-              });
+            return this.zabbix.getAllHosts(groupFilter).then(function (hosts) {
+              _this3.metric.hostList = hosts;
+              return hosts;
             });
           }
         }, {
           key: 'suggestApps',
           value: function suggestApps() {
-            var self = this;
+            var _this4 = this;
+
+            var groupFilter = this.replaceTemplateVars(this.target.group.filter);
             var hostFilter = this.replaceTemplateVars(this.target.host.filter);
-            return this.datasource.queryProcessor.filterHosts(self.metric.hostList, hostFilter).then(function (hosts) {
-              var hostids = _.map(hosts, 'hostid');
-              return self.zabbix.getApps(hostids).then(function (apps) {
-                return self.metric.appList = apps;
-              });
+            return this.zabbix.getAllApps(groupFilter, hostFilter).then(function (apps) {
+              _this4.metric.appList = apps;
+              return apps;
             });
           }
         }, {
           key: 'suggestItems',
           value: function suggestItems() {
+            var _this5 = this;
+
             var itemtype = arguments.length <= 0 || arguments[0] === undefined ? 'num' : arguments[0];
 
-            var self = this;
+            var groupFilter = this.replaceTemplateVars(this.target.group.filter);
+            var hostFilter = this.replaceTemplateVars(this.target.host.filter);
             var appFilter = this.replaceTemplateVars(this.target.application.filter);
-            if (appFilter) {
-              // Filter by applications
-              return this.datasource.queryProcessor.filterApps(self.metric.appList, appFilter).then(function (apps) {
-                var appids = _.map(apps, 'applicationid');
-                return self.zabbix.getItems(undefined, appids, itemtype).then(function (items) {
-                  if (!self.target.options.showDisabledItems) {
-                    items = _.filter(items, { 'status': '0' });
-                  }
-                  self.metric.itemList = items;
-                  return items;
-                });
-              });
-            } else {
-              // Return all items belonged to selected hosts
-              var hostids = _.map(self.metric.hostList, 'hostid');
-              return self.zabbix.getItems(hostids, undefined, itemtype).then(function (items) {
-                if (!self.target.options.showDisabledItems) {
-                  items = _.filter(items, { 'status': '0' });
-                }
-                self.metric.itemList = items;
-                return items;
-              });
-            }
+            var options = {
+              itemtype: itemtype,
+              showDisabledItems: this.target.options.showDisabledItems
+            };
+
+            return this.zabbix.getAllItems(groupFilter, hostFilter, appFilter, options).then(function (items) {
+              _this5.metric.itemList = items;
+              return items;
+            });
           }
         }, {
           key: 'isRegex',
@@ -363,10 +342,11 @@ System.register(['app/plugins/sdk', 'angular', 'lodash', './utils', './metricFun
         }, {
           key: 'updateITServiceList',
           value: function updateITServiceList() {
-            var self = this;
-            this.datasource.zabbixAPI.getITService().then(function (iteservices) {
-              self.itserviceList = [];
-              self.itserviceList = self.itserviceList.concat(iteservices);
+            var _this6 = this;
+
+            this.zabbix.getITService().then(function (iteservices) {
+              _this6.itserviceList = [];
+              _this6.itserviceList = _this6.itserviceList.concat(iteservices);
             });
           }
         }, {
